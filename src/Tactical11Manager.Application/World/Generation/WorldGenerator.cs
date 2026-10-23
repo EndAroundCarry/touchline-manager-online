@@ -25,6 +25,8 @@ namespace Tactical11Manager.Application.World.Generation;
 /// <param name="Country">The country the tier belongs to; supplies its code, name pool, and display name.</param>
 /// <param name="Tier">The tier number, starting at 1.</param>
 /// <param name="Season">The season the tier plays in.</param>
+/// <param name="LeagueNumber">The league's number within the tier, starting at 1.</param>
+/// <param name="ParentDivisionId">The division of the tier above that this league feeds; null for the top division.</param>
 /// <param name="Activate">
 /// Whether the division is claimable immediately. True for the seeded tier 1; false for a provisioned tier,
 /// which stays in provisioning until its backfill and validation complete (`PYR-8`).
@@ -39,6 +41,8 @@ public sealed record TierGenerationRequest(
     Country Country,
     int Tier,
     Season Season,
+    int LeagueNumber,
+    Guid? ParentDivisionId,
     bool Activate,
     DateTimeOffset? BootstrapCutoff);
 
@@ -123,13 +127,12 @@ public sealed class WorldGenerator
         var season = request.Season;
         var seed = request.Seed;
 
-        // Every country still has one league per tier until the generator builds leagues by number (milestone 3).
         var division = Division.Provision(
             Guid.CreateVersion7(),
             country.Id,
             tier,
-            leagueNumber: 1,
-            parentDivisionId: null,
+            request.LeagueNumber,
+            request.ParentDivisionId,
             country.DisplayName,
             season.Id,
             now);

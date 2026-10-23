@@ -76,6 +76,14 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
                 candidate.CountryId == countryId && candidate.TierNumber == NewTier);
 
             division.Status.Should().Be(DivisionStatus.Active, "PYR-8: the tier is claimable once validated");
+            division.LeagueNumber.Should().Be(1);
+            division.DisplayName.Should().EndWith($"Division {NewTier}.1", "PYR-15: a league below the top carries its number");
+            division.ParentDivisionId.Should().Be(
+                await db.Divisions
+                    .Where(candidate => candidate.CountryId == countryId && candidate.TierNumber == NewTier - 1)
+                    .Select(candidate => candidate.Id)
+                    .SingleAsync(),
+                "PYR-15: the new league feeds the tier above it");
 
             var divisionSeason = await db.DivisionSeasons.SingleAsync(candidate => candidate.DivisionId == division.Id);
 
@@ -113,6 +121,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
                 .GetCountryCapacityAsync(countryId, CancellationToken.None);
 
             capacity!.LowestActiveTier.Should().Be(NewTier, "PYR-8: a claim now joins the new tier");
+            capacity.Leagues.Should().Equal([(1, 1), (2, 1), (NewTier, 1)], "PYR-15: the shape is read from every division");
         }
 
         // A retried run is a no-op: the request is terminal and no second tier exists (ADR-0003).
@@ -130,6 +139,67 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
 
             (await db.Divisions.CountAsync(candidate => candidate.CountryId == countryId && candidate.TierNumber == NewTier))
                 .Should().Be(1, "PYR-3: one tier is created once");
+        }
+    }
+
+    [Fact]
+    public async Task A_request_is_in_flight_from_the_moment_it_is_recorded_until_it_completes()
+    {
+        // PYR-2: a country grows one league at a time, and this lookup is what holds a second request back.
+        Guid countryId;
+        Guid requestId;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+            var world = await db.GameWorlds.SingleAsync();
+            var season = await db.Seasons.SingleAsync(candidate => candidate.WorldId == world.Id);
+
+            countryId = await db.Countries.OrderBy(country => country.SortOrder).Select(c => c.Id).FirstAsync();
+
+            (await scope.ServiceProvider.GetRequiredService<IDivisionProvisioningRequestRepository>()
+                .FindInFlightAsync(countryId, CancellationToken.None))
+                .Should().BeNull("nothing has been requested yet");
+
+            requestId = await CreateRequestAsync(scope, countryId, targetTier: NewTier, season.Id);
+        }
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var requests = scope.ServiceProvider.GetRequiredService<IDivisionProvisioningRequestRepository>();
+
+            (await requests.FindInFlightAsync(countryId, CancellationToken.None))!.Id
+                .Should().Be(requestId, "a requested run is in flight");
+
+            var otherCountry = await scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>().Countries
+                .Where(country => country.Id != countryId)
+                .Select(country => country.Id)
+                .FirstAsync();
+
+            (await requests.FindInFlightAsync(otherCountry, CancellationToken.None))
+                .Should().BeNull("one country's request does not hold another's back");
+
+            (await requests.FindAsync(countryId, NewTier, 1, CancellationToken.None))!.Id.Should().Be(requestId);
+            (await requests.FindAsync(countryId, NewTier, 2, CancellationToken.None)).Should().BeNull("league 2 was not requested");
+        }
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProvisionDivision>()
+                .ExecuteAsync(requestId, CancellationToken.None);
+        }
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            (await scope.ServiceProvider.GetRequiredService<IDivisionProvisioningRequestRepository>()
+                .FindInFlightAsync(countryId, CancellationToken.None))
+                .Should().BeNull("a completed request is no longer in flight");
+
+            var divisions = await scope.ServiceProvider.GetRequiredService<IWorldRepository>()
+                .ListDivisionsAsync(countryId, CancellationToken.None);
+
+            divisions.Select(division => (division.TierNumber, division.LeagueNumber))
+                .Should().Equal([(1, 1), (2, 1), (NewTier, 1)]);
         }
     }
 
@@ -284,12 +354,19 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
         var repository = scope.ServiceProvider.GetRequiredService<IDivisionProvisioningRequestRepository>();
         var now = DateTimeOffset.UtcNow;
 
+        var parentId = await db.Divisions
+            .Where(division => division.CountryId == countryId
+                && division.TierNumber == targetTier - 1
+                && division.LeagueNumber == 1)
+            .Select(division => division.Id)
+            .SingleAsync();
+
         var request = DivisionProvisioningRequest.Request(
             Guid.CreateVersion7(),
             countryId,
             targetTier,
             targetLeagueNumber: 1,
-            Guid.CreateVersion7(),
+            parentId,
             seasonId,
             $"provision-test-{countryId:N}-{targetTier}",
             now);

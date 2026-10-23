@@ -102,7 +102,7 @@ internal sealed partial class ProvisioningScheduler : BackgroundService, IJobMat
                 new JobEnqueueRequest
                 {
                     JobType = ProvisionDivisionJobHandler.TypeName,
-                    BusinessKey = ProvisioningJobTypes.ProvisionKey(request.CountryId, request.TargetTier),
+                    BusinessKey = ProvisioningJobTypes.ProvisionKey(request.CountryId, request.TargetTier, request.TargetLeagueNumber),
                     PayloadJson = ProvisioningJobPayload.For(request.Id),
                     DueAt = now,
                 },

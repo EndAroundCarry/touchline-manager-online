@@ -106,11 +106,23 @@ public sealed record OpenTenureRow(ClubTenure Tenure, Club Club, Manager Manager
 /// <summary>Persistence for pyramid-expansion requests (`PYR-2`, `PYR-3`).</summary>
 public interface IDivisionProvisioningRequestRepository
 {
-    /// <summary>Finds the request for a country's target tier, if one exists.</summary>
+    /// <summary>Finds the request for a country's target league, if one exists.</summary>
     Task<DivisionProvisioningRequest?> FindAsync(
         Guid countryId,
         int targetTier,
+        int targetLeagueNumber,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Finds the request a country still has to finish, one that is requested or running, if any.
+    /// </summary>
+    /// <remarks>
+    /// A country grows one league at a time, so this is the check that stops a second request from being made while
+    /// the first is still being built (`PYR-2`).
+    /// </remarks>
+    /// <param name="countryId">The country.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<DivisionProvisioningRequest?> FindInFlightAsync(Guid countryId, CancellationToken cancellationToken);
 
     /// <summary>Finds a request by identity, tracked, so the provisioning worker can advance it.</summary>
     /// <param name="requestId">The request.</param>

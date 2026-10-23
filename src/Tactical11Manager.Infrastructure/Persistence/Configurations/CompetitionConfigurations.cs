@@ -61,9 +61,9 @@ internal sealed class SeasonConfiguration : IEntityTypeConfiguration<Season>
 }
 
 /// <summary>
-/// Maps <c>competition.divisions</c>. The unique index on <c>(country_id, tier_number)</c> is what
-/// makes a duplicate tier impossible even if two provisioning runs raced past every application check
-/// (`PYR-3`), and the capacity check allows the 16 clubs of today and the 18 of past seasons (`WORLD-4`); the domain pins the current size.
+/// Maps <c>competition.divisions</c>. The unique index on <c>(country_id, tier_number, league_number)</c> is what
+/// makes a duplicate league impossible even if two provisioning runs raced past every application check
+/// (`PYR-3`), and <c>parent_division_id</c> is the league of the tier above that this one feeds (`PYR-15`). The capacity check allows the 16 clubs of today and the 18 of past seasons (`WORLD-4`); the domain pins the current size.
 /// </summary>
 internal sealed class DivisionConfiguration : IEntityTypeConfiguration<Division>
 {
@@ -85,9 +85,11 @@ internal sealed class DivisionConfiguration : IEntityTypeConfiguration<Division>
         builder.Property(division => division.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(division => division.CountryId).HasColumnName("country_id").IsRequired();
         builder.Property(division => division.TierNumber).HasColumnName("tier_number").IsRequired();
-        // The league number and parent get their columns with the schema milestone; until then every tier has one league.
-        builder.Ignore(division => division.LeagueNumber);
-        builder.Ignore(division => division.ParentDivisionId);
+        builder.Property(division => division.LeagueNumber)
+            .HasColumnName("league_number")
+            .HasDefaultValue(1)
+            .IsRequired();
+        builder.Property(division => division.ParentDivisionId).HasColumnName("parent_division_id");
         builder.Property(division => division.DisplayName)
             .HasColumnName("display_name")
             .HasMaxLength(80)
@@ -103,9 +105,14 @@ internal sealed class DivisionConfiguration : IEntityTypeConfiguration<Division>
         builder.Property(division => division.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(division => division.Version).HasColumnName("version").IsRequired();
 
-        builder.HasIndex(division => new { division.CountryId, division.TierNumber })
+        builder.HasIndex(division => new { division.CountryId, division.TierNumber, division.LeagueNumber })
             .IsUnique()
-            .HasDatabaseName("ux_divisions_country_id_tier_number");
+            .HasDatabaseName("ux_divisions_country_id_tier_number_league_number");
+
+        builder.HasOne<Division>()
+            .WithMany()
+            .HasForeignKey(division => division.ParentDivisionId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Country>()
             .WithMany()

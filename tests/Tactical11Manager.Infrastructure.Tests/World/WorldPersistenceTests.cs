@@ -211,10 +211,10 @@ public sealed class WorldPersistenceTests
     }
 
     [Fact]
-    public async Task A_country_can_only_request_one_provisioning_run_per_target_tier()
+    public async Task A_country_can_only_request_one_provisioning_run_per_target_league()
     {
         // PYR-3: this unique index, plus the country advisory lock, is what stops two concurrent
-        // takeovers from creating the same tier twice.
+        // takeovers from creating the same league twice.
         await using var scope = _fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
         var now = _fixture.Clock.UtcNow;
@@ -222,19 +222,50 @@ public sealed class WorldPersistenceTests
         var (_, clubId) = await ArrangeClubAsync(scope);
         var countryId = await ReadCountryIdAsync(db, clubId);
         var seasonId = await db.Seasons.Select(season => season.Id).FirstAsync();
+        var parentId = await TopDivisionIdAsync(db, countryId);
 
         db.DivisionProvisioningRequests.Add(
-            DivisionProvisioningRequest.Request(Guid.CreateVersion7(), countryId, 2, 1, Guid.CreateVersion7(), seasonId, "seed-a", now));
+            DivisionProvisioningRequest.Request(Guid.CreateVersion7(), countryId, 2, 1, parentId, seasonId, "seed-a", now));
+        await db.SaveChangesAsync();
+
+        // A second league of the same tier is a different target and fits (PYR-15).
+        db.DivisionProvisioningRequests.Add(
+            DivisionProvisioningRequest.Request(Guid.CreateVersion7(), countryId, 2, 2, parentId, seasonId, "seed-c", now));
         await db.SaveChangesAsync();
 
         db.DivisionProvisioningRequests.Add(
-            DivisionProvisioningRequest.Request(Guid.CreateVersion7(), countryId, 2, 1, Guid.CreateVersion7(), seasonId, "seed-b", now));
+            DivisionProvisioningRequest.Request(Guid.CreateVersion7(), countryId, 2, 1, parentId, seasonId, "seed-b", now));
 
         var act = async () => await db.SaveChangesAsync();
         var exception = await act.Should().ThrowAsync<DbUpdateException>();
 
-        ConstraintOf(exception).Should().Be("ux_division_provisioning_requests_country_id_target_tier");
+        ConstraintOf(exception).Should().Be("ux_division_provisioning_requests_country_target_league");
     }
+
+    [Fact]
+    public async Task A_provisioning_request_must_name_a_parent_division_that_exists()
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var (_, clubId) = await ArrangeClubAsync(scope);
+        var countryId = await ReadCountryIdAsync(db, clubId);
+        var seasonId = await db.Seasons.Select(season => season.Id).FirstAsync();
+
+        db.DivisionProvisioningRequests.Add(DivisionProvisioningRequest.Request(
+            Guid.CreateVersion7(), countryId, 2, 1, Guid.CreateVersion7(), seasonId, "seed-orphan", _fixture.Clock.UtcNow));
+
+        var act = async () => await db.SaveChangesAsync();
+        var exception = await act.Should().ThrowAsync<DbUpdateException>();
+
+        ConstraintOf(exception).Should().Be("FK_division_provisioning_requests_divisions_parent_division_id");
+    }
+
+    private static Task<Guid> TopDivisionIdAsync(Tactical11ManagerDbContext db, Guid countryId) =>
+        db.Divisions
+            .Where(division => division.CountryId == countryId && division.TierNumber == 1)
+            .Select(division => division.Id)
+            .SingleAsync();
 
     [Fact]
     public async Task A_provisioning_run_for_tier_one_is_refused_by_the_database()
@@ -248,12 +279,15 @@ public sealed class WorldPersistenceTests
         var countryId = await ReadCountryIdAsync(db, clubId);
         var seasonId = await db.Seasons.Select(season => season.Id).FirstAsync();
 
+        var topDivisionId = await TopDivisionIdAsync(db, countryId);
+
         var act = () => db.Database.ExecuteSqlRawAsync(
             "insert into world.division_provisioning_requests "
-            + "(id, country_id, target_tier, target_season_id, status, generation_seed, requested_at, created_at, updated_at, version) "
-            + "values ({0}, {1}, 1, {2}, 'requested', 'seed', now(), now(), now(), 1)",
+            + "(id, country_id, target_tier, parent_division_id, target_season_id, status, generation_seed, requested_at, created_at, updated_at, version) "
+            + "values ({0}, {1}, 1, {2}, {3}, 'requested', 'seed', now(), now(), now(), 1)",
             Guid.CreateVersion7(),
             countryId,
+            topDivisionId,
             seasonId);
 
         var exception = await act.Should().ThrowAsync<PostgresException>();
@@ -287,7 +321,7 @@ public sealed class WorldPersistenceTests
     }
 
     [Fact]
-    public async Task A_country_cannot_have_two_divisions_at_the_same_tier()
+    public async Task A_country_cannot_have_two_divisions_at_the_same_tier_and_league()
     {
         await using var scope = _fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
@@ -320,7 +354,30 @@ public sealed class WorldPersistenceTests
         var act = async () => await db.SaveChangesAsync();
         var exception = await act.Should().ThrowAsync<DbUpdateException>();
 
-        ConstraintOf(exception).Should().Be("ux_divisions_country_id_tier_number");
+        ConstraintOf(exception).Should().Be("ux_divisions_country_id_tier_number_league_number");
+    }
+
+    [Fact]
+    public async Task A_tier_can_hold_a_second_league_that_feeds_the_tier_above()
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var (_, clubId) = await ArrangeClubAsync(scope);
+        var countryId = await ReadCountryIdAsync(db, clubId);
+        var seasonId = await db.Seasons.Select(season => season.Id).FirstAsync();
+        var parentId = await TopDivisionIdAsync(db, countryId);
+
+        var league = Division.Provision(Guid.CreateVersion7(), countryId, 6, 2, parentId, "England", seasonId, _fixture.Clock.UtcNow);
+
+        db.Divisions.Add(league);
+        await db.SaveChangesAsync();
+
+        var stored = await db.Divisions.AsNoTracking().SingleAsync(division => division.Id == league.Id);
+
+        stored.LeagueNumber.Should().Be(2);
+        stored.ParentDivisionId.Should().Be(parentId);
+        stored.DisplayName.Should().Be("England Division 6.2");
     }
 
     [Fact]

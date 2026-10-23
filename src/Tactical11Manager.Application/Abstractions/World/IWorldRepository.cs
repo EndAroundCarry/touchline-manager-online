@@ -60,16 +60,32 @@ public interface IWorldRepository
     Task<Division?> FindDivisionAsync(Guid divisionId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Finds a country's division at a tier, if it exists.
+    /// Finds a country's division at a tier and league number, if it exists.
     /// </summary>
     /// <remarks>
-    /// The provisioning worker's idempotency check: a retried run finds the tier the first attempt generated
+    /// The provisioning worker's idempotency check: a retried run finds the league the first attempt generated
     /// and resumes rather than generating a second (`PYR-3`, ADR-0003).
     /// </remarks>
     /// <param name="countryId">The country.</param>
     /// <param name="tierNumber">The tier.</param>
+    /// <param name="leagueNumber">The league's number within the tier.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task<Division?> FindDivisionByTierAsync(Guid countryId, int tierNumber, CancellationToken cancellationToken);
+    Task<Division?> FindDivisionByLeagueAsync(
+        Guid countryId,
+        int tierNumber,
+        int leagueNumber,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists every division a country has, in any status, by tier and then league number (`PYR-15`).
+    /// </summary>
+    /// <remarks>
+    /// Provisioning and retired leagues are included: a league that is still being built already holds its slot in
+    /// the pyramid. Each row carries its parent division.
+    /// </remarks>
+    /// <param name="countryId">The country.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<Division>> ListDivisionsAsync(Guid countryId, CancellationToken cancellationToken);
 
     /// <summary>Stages a new division.</summary>
     void AddDivision(Division division);

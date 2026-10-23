@@ -181,14 +181,14 @@ public sealed class GetCountryCapacity
             snapshot.DivisionId,
             snapshot.ClubsInCountry,
             snapshot.HumanOccupiedClubs,
-            [.. Enumerable.Range(1, snapshot.LowestActiveTier).Select(tier => (tier, 1))]);
+            snapshot.Leagues);
 
         // The provisioning record is only interesting while the country is full: that is the only time
         // onboarding is actually waiting on it. Until the response reports the next league (milestone 5) that is
         // still the tier below the lowest.
         var targetTier = snapshot.LowestActiveTier + 1;
         var provisioning = rules.CountryIsFull
-            ? await _requests.FindAsync(snapshot.CountryId, targetTier, cancellationToken)
+            ? await _requests.FindAsync(snapshot.CountryId, targetTier, targetLeagueNumber: 1, cancellationToken)
             : null;
 
         return new CountryCapacityResponse(

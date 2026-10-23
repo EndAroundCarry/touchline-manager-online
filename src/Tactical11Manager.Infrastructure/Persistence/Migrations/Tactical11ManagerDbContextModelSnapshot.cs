@@ -862,6 +862,16 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("display_name");
 
+                    b.Property<int>("LeagueNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("league_number");
+
+                    b.Property<Guid?>("ParentDivisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_division_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -884,9 +894,11 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CreatedSeasonId");
 
-                    b.HasIndex("CountryId", "TierNumber")
+                    b.HasIndex("ParentDivisionId");
+
+                    b.HasIndex("CountryId", "TierNumber", "LeagueNumber")
                         .IsUnique()
-                        .HasDatabaseName("ux_divisions_country_id_tier_number");
+                        .HasDatabaseName("ux_divisions_country_id_tier_number_league_number");
 
                     b.ToTable("divisions", "competition", t =>
                         {
@@ -5055,6 +5067,10 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("generation_seed");
 
+                    b.Property<Guid>("ParentDivisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_division_id");
+
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("requested_at");
@@ -5068,6 +5084,12 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasColumnName("status");
+
+                    b.Property<int>("TargetLeagueNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("target_league_number");
 
                     b.Property<Guid>("TargetSeasonId")
                         .HasColumnType("uuid")
@@ -5087,9 +5109,11 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CountryId", "TargetTier")
+                    b.HasIndex("ParentDivisionId");
+
+                    b.HasIndex("CountryId", "TargetTier", "TargetLeagueNumber")
                         .IsUnique()
-                        .HasDatabaseName("ux_division_provisioning_requests_country_id_target_tier");
+                        .HasDatabaseName("ux_division_provisioning_requests_country_target_league");
 
                     b.ToTable("division_provisioning_requests", "world", t =>
                         {
@@ -5746,6 +5770,11 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasForeignKey("CreatedSeasonId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Division", null)
+                        .WithMany()
+                        .HasForeignKey("ParentDivisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Tactical11Manager.Domain.Competition.DivisionSeason", b =>
@@ -6437,6 +6466,12 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                     b.HasOne("Tactical11Manager.Domain.World.Country", null)
                         .WithMany()
                         .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Division", null)
+                        .WithMany()
+                        .HasForeignKey("ParentDivisionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

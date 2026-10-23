@@ -139,7 +139,7 @@ public sealed class AssignClubToAi
 
         // The closed tenure is visible to this evaluation only now that it has been saved, and it is what
         // makes the country's occupancy fall.
-        await _capacity.EnsureNextTierRequestedAsync(club.CountryId, cancellationToken);
+        await _capacity.EnsureNextLeagueRequestedAsync(club.CountryId, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);

@@ -185,7 +185,7 @@ public sealed partial class EvaluateInactivity
             TransactionIsolation.ReadCommitted,
             cancellationToken);
 
-        await _capacity.EnsureNextTierRequestedAsync(countryId, cancellationToken);
+        await _capacity.EnsureNextLeagueRequestedAsync(countryId, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }

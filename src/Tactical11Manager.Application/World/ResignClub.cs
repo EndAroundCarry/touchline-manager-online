@@ -174,7 +174,7 @@ public sealed class ResignClub
 
         // The closed tenure is visible to this evaluation only now that it has been saved, and it is what
         // makes the country's occupancy fall.
-        await _capacity.EnsureNextTierRequestedAsync(club.Country.Id, cancellationToken);
+        await _capacity.EnsureNextLeagueRequestedAsync(club.Country.Id, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);

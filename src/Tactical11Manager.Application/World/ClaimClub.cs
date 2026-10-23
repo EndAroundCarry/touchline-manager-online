@@ -295,7 +295,7 @@ public sealed class ClaimClub
         {
             // PYR-2: the country is full, so the answer is a new tier rather than a refusal with no
             // way forward. PYR-10 requires the request's state to come back with the response.
-            var provisioning = await _capacity.EnsureNextTierRequestedAsync(club.CountryId, cancellationToken);
+            var provisioning = await _capacity.EnsureNextLeagueRequestedAsync(club.CountryId, cancellationToken);
 
             Record(WorldAuditActions.ClaimRefusedAtCapacity, userId, AuditTargetTypes.Club, club.Id, "country at capacity");
 
@@ -370,7 +370,7 @@ public sealed class ClaimClub
 
         // PYR-1: this takeover may be the one that filled the tier, and the row that filled it is only
         // visible to the evaluation once it has been saved inside the transaction.
-        await _capacity.EnsureNextTierRequestedAsync(club.CountryId, cancellationToken);
+        await _capacity.EnsureNextLeagueRequestedAsync(club.CountryId, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);

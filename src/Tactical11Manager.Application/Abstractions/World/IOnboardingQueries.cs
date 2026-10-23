@@ -129,6 +129,10 @@ public interface IAdvisoryLock
 /// <param name="HumanOccupiedClubs">
 /// How many hold an open human tenure. Inactive tenures count (`OCC-8`); suspended accounts do not.
 /// </param>
+/// <param name="Leagues">
+/// The tier and league number of every division the country has, in any status, which is what the pyramid shape
+/// reads to name the league that comes next (`PYR-15`).
+/// </param>
 public sealed record CountryCapacitySnapshot(
     Guid CountryId,
     int LowestActiveTier,
@@ -136,7 +140,8 @@ public sealed record CountryCapacitySnapshot(
     Guid DivisionSeasonId,
     string DivisionName,
     int ClubsInCountry,
-    int HumanOccupiedClubs);
+    int HumanOccupiedClubs,
+    IReadOnlyList<(int Tier, int League)> Leagues);
 
 /// <summary>One club in a country's active tiers, as offered to a manager.</summary>
 /// <param name="Id">The club identity.</param>

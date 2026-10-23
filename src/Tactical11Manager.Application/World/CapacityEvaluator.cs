@@ -58,16 +58,20 @@ public sealed class CapacityEvaluator
     }
 
     /// <summary>
-    /// Creates the next tier's provisioning request when the country's lowest active tier is full and no
-    /// request exists yet.
+    /// Creates the next league's provisioning request when the country needs one and none is in flight.
     /// </summary>
+    /// <remarks>
+    /// A country grows one league at a time. A request that is still requested or running is returned as it
+    /// is, so a rush of claims never makes two overlapping requests; growth then chains through the re-check
+    /// after each activation (`PYR-2`, `PYR-11`).
+    /// </remarks>
     /// <param name="countryId">The country to evaluate.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
     /// The request's state, whether it was just created or already existed, or <see langword="null"/> when
-    /// the country still has room and no tier is needed.
+    /// the country still has room and no league is needed.
     /// </returns>
-    public async Task<ProvisioningStatusResponse?> EnsureNextTierRequestedAsync(
+    public async Task<ProvisioningStatusResponse?> EnsureNextLeagueRequestedAsync(
         Guid countryId,
         CancellationToken cancellationToken)
     {
@@ -84,17 +88,25 @@ public sealed class CapacityEvaluator
             capacity.DivisionId,
             capacity.ClubsInCountry,
             capacity.HumanOccupiedClubs,
-            [.. Enumerable.Range(1, capacity.LowestActiveTier).Select(tier => (tier, 1))]);
+            capacity.Leagues);
 
-        // Until growth follows the 30% rule and the pyramid shape (milestones 2 and 3) a country still grows a tier at a
-        // time, once every club has a human manager.
+        // Until the provisioning worker builds leagues by number (milestone 3) a country still grows a tier at a
+        // time, once every club has a human manager, into league 1 of the tier below the lowest.
         if (!rules.CountryIsFull)
         {
             return null;
         }
 
+        var inFlight = await _requests.FindInFlightAsync(countryId, cancellationToken);
+
+        if (inFlight is not null)
+        {
+            return inFlight.ToProvisioningResponse(_options.ProvisioningPollSeconds);
+        }
+
         var targetTier = capacity.LowestActiveTier + 1;
-        var existing = await _requests.FindAsync(countryId, targetTier, cancellationToken);
+        const int targetLeague = 1;
+        var existing = await _requests.FindAsync(countryId, targetTier, targetLeague, cancellationToken);
 
         if (existing is not null)
         {
@@ -124,7 +136,7 @@ public sealed class CapacityEvaluator
             Guid.CreateVersion7(),
             countryId,
             targetTier,
-            targetLeagueNumber: 1,
+            targetLeague,
             capacity.DivisionId,
             season.Id,
             GenerationSeedFor(world.Id, country.Code, targetTier),

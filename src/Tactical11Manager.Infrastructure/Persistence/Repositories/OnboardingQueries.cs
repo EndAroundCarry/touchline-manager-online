@@ -47,7 +47,7 @@ internal sealed class OnboardingQueries : IOnboardingQueries
             where division.CountryId == countryId
                 && division.Status == DivisionStatus.Active
                 && divisionSeason.SeasonId == season.Value.SeasonId
-            orderby division.TierNumber descending
+            orderby division.TierNumber descending, division.LeagueNumber descending
             select new
             {
                 division.Id,
@@ -70,6 +70,15 @@ internal sealed class OnboardingQueries : IOnboardingQueries
 
         var occupied = await OccupiedClubsAsync(divisionSeasonIds, cancellationToken);
 
+        // A league still being provisioned has no season-instance in the count above, but it already holds its slot in the
+        // pyramid, so the shape is read from every division in any status.
+        var leagues = (await _dbContext.Divisions
+            .Where(division => division.CountryId == countryId)
+            .Select(division => new { division.TierNumber, division.LeagueNumber })
+            .ToListAsync(cancellationToken))
+            .Select(division => (division.TierNumber, division.LeagueNumber))
+            .ToList();
+
         return new CountryCapacitySnapshot(
             countryId,
             lowest.TierNumber,
@@ -77,7 +86,8 @@ internal sealed class OnboardingQueries : IOnboardingQueries
             lowest.DivisionSeasonId,
             lowest.DisplayName,
             clubsInCountry,
-            occupied);
+            occupied,
+            leagues);
     }
 
     /// <inheritdoc />

@@ -235,10 +235,14 @@ public sealed class SeasonRolloverControlsTests
         public Task<Division?> FindDivisionAsync(Guid divisionId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<Division?> FindDivisionByTierAsync(
+        public Task<Division?> FindDivisionByLeagueAsync(
             Guid countryId,
             int tierNumber,
+            int leagueNumber,
             CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Division>> ListDivisionsAsync(Guid countryId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
 
         public void AddDivision(Division division) => throw new NotSupportedException();
 

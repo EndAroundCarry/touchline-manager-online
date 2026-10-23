@@ -97,7 +97,9 @@ public sealed class TriggerProvisioning
                 TriggerProvisioningOutcome.CountryNotFound, countryId, targetTier, null, string.Empty, false);
         }
 
-        var request = await _requests.FindAsync(countryId, targetTier, cancellationToken);
+        // Until the trigger targets the next league (milestone 3) it still asks for league 1 of a tier.
+        const int targetLeague = 1;
+        var request = await _requests.FindAsync(countryId, targetTier, targetLeague, cancellationToken);
 
         if (request is null)
         {
@@ -109,9 +111,11 @@ public sealed class TriggerProvisioning
                     TriggerProvisioningOutcome.NoSeason, countryId, targetTier, null, string.Empty, false);
             }
 
-            // Until the trigger targets the next league (milestone 3) it still asks for league 1 of a tier, which
-            // feeds league 1 of the tier above.
-            var parent = await _world.FindDivisionByTierAsync(countryId, targetTier - 1, cancellationToken);
+            var parent = await _world.FindDivisionByLeagueAsync(
+                countryId,
+                targetTier - 1,
+                PyramidShape.ParentLeagueOf(targetTier, targetLeague),
+                cancellationToken);
 
             if (parent is null)
             {
@@ -123,7 +127,7 @@ public sealed class TriggerProvisioning
                 Guid.CreateVersion7(),
                 countryId,
                 targetTier,
-                targetLeagueNumber: 1,
+                targetLeague,
                 parent.Id,
                 season.Id,
                 CapacityEvaluator.GenerationSeedFor(world.Id, country.Code, targetTier),
@@ -134,7 +138,7 @@ public sealed class TriggerProvisioning
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
-        var key = ProvisioningJobTypes.ProvisionKey(countryId, targetTier);
+        var key = ProvisioningJobTypes.ProvisionKey(countryId, targetTier, targetLeague);
 
         var enqueued = await _jobs.EnqueueAsync(
             new JobEnqueueRequest

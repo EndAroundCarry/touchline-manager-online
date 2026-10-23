@@ -164,6 +164,8 @@ public sealed partial class SeedWorld
 
             // The one generation path, shared with the provisioning worker. The seeded tiers are claimable the
             // moment they exist; a provisioned tier stays in provisioning until its backfill completes (PYR-8).
+            Guid? parentDivisionId = null;
+
             for (var tierNumber = 1; tierNumber <= WorldRuleSet.SeededTiers; tierNumber++)
             {
                 var tier = _generator.BuildTier(
@@ -173,10 +175,13 @@ public sealed partial class SeedWorld
                         Country: country,
                         Tier: tierNumber,
                         Season: season,
+                        LeagueNumber: 1,
+                        ParentDivisionId: parentDivisionId,
                         Activate: true,
                         BootstrapCutoff: null),
                     now);
 
+                parentDivisionId = tier.DivisionId;
                 clubsCreated += tier.Clubs;
                 playersCreated += tier.Players;
                 accountsCreated += tier.Accounts;

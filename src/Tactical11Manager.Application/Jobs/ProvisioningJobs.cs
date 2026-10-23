@@ -7,8 +7,8 @@ namespace Tactical11Manager.Application.Jobs;
 /// The job that generates a country's next tier (`PYR-4`, master plan §7.2, ADR-0005).
 /// </summary>
 /// <remarks>
-/// A durable row with a business key derived from the country and the target tier — <c>country:{id}:tier:{n}:provision</c>,
-/// the key ADR-0003 names. The key is what makes the queue's at-least-once delivery safe: a materialiser that
+/// A durable row with a business key derived from the country and the target league — <c>country:{id}:tier:{n}:league:{m}:provision</c>,
+/// the key ADR-0003 names, widened with the league number now that a tier holds several leagues. The key is what makes the queue's at-least-once delivery safe: a materialiser that
 /// runs every few minutes, a worker that restarts mid-job, and an operator who retries a dead letter all
 /// enqueue the same key, and the database refuses the second insertion.
 /// </remarks>
@@ -17,11 +17,12 @@ public static class ProvisioningJobTypes
     /// <summary>Generates, backfills, validates, and activates a requested tier (`PYR-4`…`PYR-8`).</summary>
     public const string Provision = "world.provision-division";
 
-    /// <summary>Gets the business key of a tier's provisioning job.</summary>
+    /// <summary>Gets the business key of a league's provisioning job.</summary>
     /// <param name="countryId">The country.</param>
     /// <param name="targetTier">The tier being generated.</param>
-    public static string ProvisionKey(Guid countryId, int targetTier) =>
-        string.Create(CultureInfo.InvariantCulture, $"country:{countryId:D}:tier:{targetTier}:provision");
+    /// <param name="targetLeague">The league's number within the tier.</param>
+    public static string ProvisionKey(Guid countryId, int targetTier, int targetLeague) =>
+        string.Create(CultureInfo.InvariantCulture, $"country:{countryId:D}:tier:{targetTier}:league:{targetLeague}:provision");
 }
 
 /// <summary>The payload the provisioning job carries: which request it is for.</summary>

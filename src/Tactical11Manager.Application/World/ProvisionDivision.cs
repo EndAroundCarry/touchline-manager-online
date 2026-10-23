@@ -138,6 +138,7 @@ public sealed partial class ProvisionDivision
         var now = _clock.UtcNow;
         Guid countryId;
         int targetTier;
+        int targetLeague;
         Guid divisionSeasonId;
         int clubs;
         int players;
@@ -153,6 +154,7 @@ public sealed partial class ProvisionDivision
 
             countryId = request.CountryId;
             targetTier = request.TargetTier;
+            targetLeague = request.TargetLeagueNumber;
 
             await _locks.AcquireAsync(AdvisoryLockKey.Country(countryId), cancellationToken);
 
@@ -181,7 +183,7 @@ public sealed partial class ProvisionDivision
                 ?? throw new PermanentJobFailureException(
                     $"The target season {request.TargetSeasonId} does not exist (PYR-5).");
 
-            var existing = await _world.FindDivisionByTierAsync(countryId, targetTier, cancellationToken);
+            var existing = await _world.FindDivisionByLeagueAsync(countryId, targetTier, targetLeague, cancellationToken);
 
             if (existing is null)
             {
@@ -199,6 +201,8 @@ public sealed partial class ProvisionDivision
                         Country: country,
                         Tier: targetTier,
                         Season: season,
+                        LeagueNumber: targetLeague,
+                        ParentDivisionId: request.ParentDivisionId,
                         // A provisioned tier is not claimable until its backfill and validation complete
                         // (PYR-8); activation happens in phase four.
                         Activate: false,
@@ -311,7 +315,7 @@ public sealed partial class ProvisionDivision
                     $"Provisioned tier {targetTier} of country {countryId} failed validation: {diagnostics} (PYR-8).");
             }
 
-            var division = await _world.FindDivisionByTierAsync(countryId, targetTier, cancellationToken)
+            var division = await _world.FindDivisionByLeagueAsync(countryId, targetTier, targetLeague, cancellationToken)
                 ?? throw new PermanentJobFailureException(
                     $"The provisioned tier {targetTier} of country {countryId} vanished before activation (PYR-8).");
 
@@ -346,7 +350,7 @@ public sealed partial class ProvisionDivision
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // PYR-11: the tier that just filled might already be full, so growth continues by the same path.
-            await _capacity.EnsureNextTierRequestedAsync(countryId, cancellationToken);
+            await _capacity.EnsureNextLeagueRequestedAsync(countryId, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }

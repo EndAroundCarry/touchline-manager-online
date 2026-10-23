@@ -282,7 +282,7 @@ internal sealed class ClubTenureConfiguration : IEntityTypeConfiguration<ClubTen
 
 /// <summary>
 /// Maps <c>world.division_provisioning_requests</c>. The unique index on
-/// <c>(country_id, target_tier)</c> is the primary defence against a duplicate tier (`PYR-3`).
+/// <c>(country_id, target_tier, target_league_number)</c> is the primary defence against a duplicate league (`PYR-3`).
 /// </summary>
 internal sealed class DivisionProvisioningRequestConfiguration : IEntityTypeConfiguration<DivisionProvisioningRequest>
 {
@@ -306,9 +306,11 @@ internal sealed class DivisionProvisioningRequestConfiguration : IEntityTypeConf
         builder.Property(request => request.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(request => request.CountryId).HasColumnName("country_id").IsRequired();
         builder.Property(request => request.TargetTier).HasColumnName("target_tier").IsRequired();
-        // The target league and parent get their columns with the schema milestone; until then every tier has one league.
-        builder.Ignore(request => request.TargetLeagueNumber);
-        builder.Ignore(request => request.ParentDivisionId);
+        builder.Property(request => request.TargetLeagueNumber)
+            .HasColumnName("target_league_number")
+            .HasDefaultValue(1)
+            .IsRequired();
+        builder.Property(request => request.ParentDivisionId).HasColumnName("parent_division_id").IsRequired();
         builder.Property(request => request.TargetSeasonId).HasColumnName("target_season_id").IsRequired();
         builder.Property(request => request.Status)
             .HasColumnName("status")
@@ -329,13 +331,18 @@ internal sealed class DivisionProvisioningRequestConfiguration : IEntityTypeConf
         builder.Property(request => request.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(request => request.Version).HasColumnName("version").IsRequired();
 
-        builder.HasIndex(request => new { request.CountryId, request.TargetTier })
+        builder.HasIndex(request => new { request.CountryId, request.TargetTier, request.TargetLeagueNumber })
             .IsUnique()
-            .HasDatabaseName("ux_division_provisioning_requests_country_id_target_tier");
+            .HasDatabaseName("ux_division_provisioning_requests_country_target_league");
 
         builder.HasOne<Country>()
             .WithMany()
             .HasForeignKey(request => request.CountryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Division>()
+            .WithMany()
+            .HasForeignKey(request => request.ParentDivisionId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

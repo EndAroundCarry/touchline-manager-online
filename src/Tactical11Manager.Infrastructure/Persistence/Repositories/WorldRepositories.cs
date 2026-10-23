@@ -72,13 +72,26 @@ internal sealed class WorldRepository : IWorldRepository
         _dbContext.Divisions.SingleOrDefaultAsync(division => division.Id == divisionId, cancellationToken);
 
     /// <inheritdoc />
-    public Task<Division?> FindDivisionByTierAsync(
+    public Task<Division?> FindDivisionByLeagueAsync(
         Guid countryId,
         int tierNumber,
+        int leagueNumber,
         CancellationToken cancellationToken) =>
         _dbContext.Divisions.SingleOrDefaultAsync(
-            division => division.CountryId == countryId && division.TierNumber == tierNumber,
+            division => division.CountryId == countryId
+                && division.TierNumber == tierNumber
+                && division.LeagueNumber == leagueNumber,
             cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Division>> ListDivisionsAsync(
+        Guid countryId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.Divisions
+            .Where(division => division.CountryId == countryId)
+            .OrderBy(division => division.TierNumber)
+            .ThenBy(division => division.LeagueNumber)
+            .ToListAsync(cancellationToken);
 
     /// <inheritdoc />
     public void AddDivision(Division division) => _dbContext.Divisions.Add(division);
@@ -307,10 +320,22 @@ internal sealed class DivisionProvisioningRequestRepository : IDivisionProvision
     public Task<DivisionProvisioningRequest?> FindAsync(
         Guid countryId,
         int targetTier,
+        int targetLeagueNumber,
         CancellationToken cancellationToken) =>
         _dbContext.DivisionProvisioningRequests.SingleOrDefaultAsync(
-            request => request.CountryId == countryId && request.TargetTier == targetTier,
+            request => request.CountryId == countryId
+                && request.TargetTier == targetTier
+                && request.TargetLeagueNumber == targetLeagueNumber,
             cancellationToken);
+
+    /// <inheritdoc />
+    public Task<DivisionProvisioningRequest?> FindInFlightAsync(Guid countryId, CancellationToken cancellationToken) =>
+        _dbContext.DivisionProvisioningRequests
+            .Where(request => request.CountryId == countryId
+                && (request.Status == ProvisioningRequestStatus.Requested
+                    || request.Status == ProvisioningRequestStatus.Running))
+            .OrderBy(request => request.RequestedAt)
+            .FirstOrDefaultAsync(cancellationToken);
 
     /// <inheritdoc />
     public Task<DivisionProvisioningRequest?> FindByIdAsync(Guid requestId, CancellationToken cancellationToken) =>
