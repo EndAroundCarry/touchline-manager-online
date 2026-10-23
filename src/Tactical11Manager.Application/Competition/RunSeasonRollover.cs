@@ -171,7 +171,7 @@ public sealed partial class RunSeasonRollover
 
         var movePlan = await LoadPlanAsync(world, season, cancellationToken);
         var relegated = movePlan.Countries
-            .SelectMany(country => PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country)))
+            .SelectMany(country => SeasonRolloverPlanLoader.MovementsOf(country))
             .Where(movement => movement.IsRelegated)
             .Select(movement => movement.ClubId)
             .ToHashSet();
@@ -182,10 +182,10 @@ public sealed partial class RunSeasonRollover
         await CompleteAsync(world, season, nextSeasonId, now, cancellationToken);
 
         var promotions = movePlan.Countries
-            .SelectMany(country => PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country)))
+            .SelectMany(country => SeasonRolloverPlanLoader.MovementsOf(country))
             .Count(movement => movement.IsPromoted);
         var relegations = movePlan.Countries
-            .SelectMany(country => PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country)))
+            .SelectMany(country => SeasonRolloverPlanLoader.MovementsOf(country))
             .Count(movement => movement.IsRelegated);
 
         LogRolledOver(world.Id, season.Id, nextSeasonId, movePlan.Countries.Count, promotions, relegations);
@@ -345,7 +345,7 @@ public sealed partial class RunSeasonRollover
 
         foreach (var country in plan.Countries)
         {
-            var movements = PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country))
+            var movements = SeasonRolloverPlanLoader.MovementsOf(country)
                 .ToDictionary(movement => movement.ClubId);
 
             foreach (var tier in country.Tiers)
@@ -380,7 +380,7 @@ public sealed partial class RunSeasonRollover
         }
 
         var nextTierOf = plan.Countries
-            .SelectMany(country => PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country)))
+            .SelectMany(country => SeasonRolloverPlanLoader.MovementsOf(country))
             .ToDictionary(movement => movement.ClubId, movement => movement.ToTier);
 
         var settlement = plan.Countries
@@ -481,7 +481,7 @@ public sealed partial class RunSeasonRollover
 
         foreach (var country in plan.Countries)
         {
-            var movements = PromotionRelegation.Compute(SeasonRolloverPlanLoader.ToTiers(country));
+            var movements = SeasonRolloverPlanLoader.MovementsOf(country);
 
             var byDestination = movements
                 .GroupBy(movement => movement.ToTier)

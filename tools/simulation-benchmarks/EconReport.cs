@@ -547,7 +547,7 @@ internal static class EconReport
 
         foreach (var result in results)
         {
-            foreach (var row in result.Sim.Rows.Where(row => row.Season < seasons && row.Tier < EconSim.Tiers && row.Rank > EconSim.ClubsPerTier - WorldRuleSet.RelegatedPerTier))
+            foreach (var row in result.Sim.Rows.Where(row => row.Season < seasons && row.Tier < EconSim.Tiers && row.Rank > EconSim.ClubsPerTier - WorldRuleSet.DirectRelegationPlaces))
             {
                 var next = result.Sim.Rows.FirstOrDefault(other => other.Season == row.Season + 1 && other.ClubIdx == row.ClubIdx);
 

@@ -117,8 +117,8 @@ public sealed class SponsorAndStandingTests
     {
         Enum.GetValues<SeasonObjective>().Select(EconomyRuleSet.TargetPlaceFor).Should().Equal(1, 3, 6, 8, 11, 13);
         EconomyRuleSet.TargetPlaceFor(SeasonObjective.TopHalf).Should().Be(EconomyRuleSet.ClubsPerDivision / 2);
-        EconomyRuleSet.TargetPlaceFor(SeasonObjective.StayUp).Should().Be(EconomyRuleSet.ClubsPerDivision - WorldRuleSet.RelegatedPerTier, "staying up is the last place that is not relegated");
-        EconomyRuleSet.OutcomeOf(SeasonObjective.StayUp, EconomyRuleSet.ClubsPerDivision - WorldRuleSet.RelegatedPerTier + 1).Should().Be(ObjectiveOutcome.Missed, "the first relegated place misses staying up");
+        EconomyRuleSet.TargetPlaceFor(SeasonObjective.StayUp).Should().Be(EconomyRuleSet.ClubsPerDivision - WorldRuleSet.DirectRelegationPlaces - 1, "staying up is the last place above the play-off place");
+        EconomyRuleSet.OutcomeOf(SeasonObjective.StayUp, EconomyRuleSet.ClubsPerDivision - WorldRuleSet.DirectRelegationPlaces).Should().Be(ObjectiveOutcome.Missed, "the play-off place misses staying up");
     }
 
     [Fact]

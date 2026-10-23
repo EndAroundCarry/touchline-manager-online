@@ -4,164 +4,301 @@ using Tactical11Manager.Domain.Competition;
 namespace Tactical11Manager.Domain.Tests.Competition;
 
 /// <summary>
-/// The movement rules between adjacent active tiers (`PR-1`…`PR-10`).
+/// The movement rules between a league and the league it feeds (`PR-1`…`PR-10`).
 /// </summary>
 /// <remarks>
-/// Every case is built from an 18-club tier, the real size, so "the bottom three" is a meaningful phrase
-/// and a rule that quietly overlapped the promoted and relegated bands would fail rather than slip through a
-/// three-club abstraction.
+/// Every case is built from a 16-club league, the real size, so "the bottom two" and "the 14th" are meaningful
+/// phrases and a rule that quietly overlapped the bands would fail rather than slip through a small abstraction.
 /// </remarks>
 public sealed class PromotionRelegationTests
 {
     [Fact]
-    public void A_country_with_one_active_tier_moves_nobody()
+    public void A_country_with_one_league_moves_nobody()
     {
-        // PR-2 and PR-9: there is no tier below to drop into and none above to climb to.
-        var tier1 = Clubs("t1", 18);
+        // PR-2 and PR-9: there is no league below to drop into and none above to climb to.
+        var top = League(1, 16);
 
-        var movements = PromotionRelegation.Compute([Tier(1, tier1)]);
+        var movements = PromotionRelegation.Compute([top.Standings], []);
 
-        movements.Should().HaveCount(18);
+        movements.Should().HaveCount(16);
         movements.Should().OnlyContain(movement => movement.IsStationary);
         movements.Should().OnlyContain(movement => movement.FromTier == 1 && movement.ToTier == 1);
+        movements.Should().OnlyContain(movement => movement.FromDivisionId == movement.ToDivisionId);
     }
 
     [Fact]
-    public void Two_tiers_exchange_three_clubs_each_way()
+    public void When_the_challenger_wins_the_final_three_clubs_move_each_way()
     {
-        // PR-1, PR-2, PR-9: three up from the lowest tier, three down from the top tier, and nobody
-        // promoted out of the top or relegated out of the bottom.
-        var tier1 = Clubs("t1", 18);
-        var tier2 = Clubs("t2", 18);
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top);
+        var challenger = second.Clubs[2];
+        var holder = top.Clubs[13];
 
-        var movements = PromotionRelegation.Compute([Tier(1, tier1), Tier(2, tier2)]);
+        var movements = PromotionRelegation.Compute(
+            [top.Standings, second.Standings],
+            Bracket(top, second, semiWinner: challenger, semiLoser: second.Clubs[3], finalWinner: challenger, finalLoser: holder));
 
-        movements.Should().HaveCount(36);
+        movements.Should().HaveCount(32);
+        movements.Count(movement => movement.IsPromoted).Should().Be(3);
+        movements.Count(movement => movement.IsRelegated).Should().Be(3);
 
-        foreach (var clubId in tier2.Take(3))
+        foreach (var clubId in second.Clubs.Take(2))
         {
             MovementOf(movements, clubId).Should().Be(
-                new ClubMovement(clubId, 2, 1, IsPromoted: true, IsRelegated: false));
+                new ClubMovement(clubId, 2, 1, true, false, second.DivisionId, top.DivisionId, MovementRoute.Direct));
         }
 
-        foreach (var clubId in tier1.TakeLast(3))
+        MovementOf(movements, challenger).Should().Be(
+            new ClubMovement(challenger, 2, 1, true, false, second.DivisionId, top.DivisionId, MovementRoute.Playoff));
+
+        foreach (var clubId in top.Clubs.TakeLast(2))
         {
             MovementOf(movements, clubId).Should().Be(
-                new ClubMovement(clubId, 1, 2, IsPromoted: false, IsRelegated: true));
+                new ClubMovement(clubId, 1, 2, false, true, top.DivisionId, second.DivisionId, MovementRoute.Direct));
         }
 
-        // The rest of the top tier stays up, and the rest of the lowest stays down: the lowest tier
-        // relegates nobody (PR-2) and the top promotes nobody (PR-9).
-        movements.Where(movement => movement.IsStationary).Should().HaveCount(30);
-        movements.Should().NotContain(movement => movement.ClubId == tier1[0] && movement.IsRelegated);
-        movements.Should().NotContain(movement => movement.ClubId == tier2[17] && movement.IsPromoted);
+        MovementOf(movements, holder).Should().Be(
+            new ClubMovement(holder, 1, 2, false, true, top.DivisionId, second.DivisionId, MovementRoute.Playoff));
+
+        movements.Where(movement => movement.IsStationary).Should().HaveCount(26);
+        PerLeague(movements, top).Should().Be(16);
+        PerLeague(movements, second).Should().Be(16);
     }
 
     [Fact]
-    public void A_middle_tier_both_promotes_and_relegates_three_clubs()
+    public void When_the_holder_wins_the_final_two_clubs_move_each_way()
     {
-        // Three active tiers: the middle tier is the case that exercises both directions at once.
-        var tier1 = Clubs("t1", 18);
-        var tier2 = Clubs("t2", 18);
-        var tier3 = Clubs("t3", 18);
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top);
+        var holder = top.Clubs[13];
 
-        var movements = PromotionRelegation.Compute([Tier(1, tier1), Tier(2, tier2), Tier(3, tier3)]);
+        var movements = PromotionRelegation.Compute(
+            [top.Standings, second.Standings],
+            Bracket(top, second, semiWinner: second.Clubs[3], semiLoser: second.Clubs[2], finalWinner: holder, finalLoser: second.Clubs[3]));
 
-        movements.Should().HaveCount(54);
+        movements.Count(movement => movement.IsPromoted).Should().Be(2);
+        movements.Count(movement => movement.IsRelegated).Should().Be(2);
+        MovementOf(movements, holder).IsStationary.Should().BeTrue();
+        MovementOf(movements, second.Clubs[3]).IsStationary.Should().BeTrue();
+        PerLeague(movements, top).Should().Be(16);
+        PerLeague(movements, second).Should().Be(16);
+    }
 
-        foreach (var clubId in tier2.Take(3))
-        {
-            MovementOf(movements, clubId).Should().Be(
-                new ClubMovement(clubId, 2, 1, IsPromoted: true, IsRelegated: false));
-        }
+    [Fact]
+    public void A_pair_with_no_play_off_moves_the_direct_places_only()
+    {
+        // A league activated too late for its play-off exchanges its 1st and 2nd against the 15th and 16th.
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top);
 
-        foreach (var clubId in tier2.TakeLast(3))
-        {
-            MovementOf(movements, clubId).Should().Be(
-                new ClubMovement(clubId, 2, 3, IsPromoted: false, IsRelegated: true));
-        }
+        var movements = PromotionRelegation.Compute([top.Standings, second.Standings], []);
 
-        foreach (var clubId in tier3.Take(3))
-        {
-            MovementOf(movements, clubId).Should().Be(
-                new ClubMovement(clubId, 3, 2, IsPromoted: true, IsRelegated: false));
-        }
+        movements.Count(movement => movement.IsPromoted).Should().Be(2);
+        movements.Count(movement => movement.IsRelegated).Should().Be(2);
+        movements.Should().OnlyContain(movement => movement.Route == MovementRoute.Direct);
+        PerLeague(movements, top).Should().Be(16);
+        PerLeague(movements, second).Should().Be(16);
+    }
 
-        foreach (var clubId in tier1.TakeLast(3))
-        {
-            MovementOf(movements, clubId).Should().Be(
-                new ClubMovement(clubId, 1, 2, IsPromoted: false, IsRelegated: true));
-        }
+    [Fact]
+    public void A_middle_league_both_promotes_and_relegates()
+    {
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top);
+        var third = League(3, 16, parent: second);
 
+        var movements = PromotionRelegation.Compute(
+            [top.Standings, second.Standings, third.Standings],
+            [
+                .. Bracket(top, second, second.Clubs[3], second.Clubs[2], second.Clubs[3], top.Clubs[13]),
+                .. Bracket(second, third, third.Clubs[2], third.Clubs[3], second.Clubs[13], third.Clubs[2]),
+            ]);
+
+        movements.Should().HaveCount(48);
+
+        MovementOf(movements, second.Clubs[0]).ToTier.Should().Be(1);
+        MovementOf(movements, second.Clubs[1]).ToTier.Should().Be(1);
+        MovementOf(movements, second.Clubs[3]).Should().Match<ClubMovement>(movement => movement.IsPromoted && movement.Route == MovementRoute.Playoff);
+        MovementOf(movements, second.Clubs[14]).ToTier.Should().Be(3);
+        MovementOf(movements, second.Clubs[15]).ToTier.Should().Be(3);
+        MovementOf(movements, second.Clubs[13]).IsStationary.Should().BeTrue("the holder won its final");
+        MovementOf(movements, third.Clubs[0]).ToTier.Should().Be(2);
+        MovementOf(movements, third.Clubs[1]).ToTier.Should().Be(2);
+        MovementOf(movements, third.Clubs[2]).IsStationary.Should().BeTrue("the challenger lost its final");
         movements.Should().OnlyContain(movement => !(movement.IsPromoted && movement.IsRelegated));
+
+        PerLeague(movements, top).Should().Be(16);
+        PerLeague(movements, second).Should().Be(16);
+        PerLeague(movements, third).Should().Be(16);
     }
 
     [Fact]
-    public void The_movement_does_not_depend_on_the_order_the_tiers_arrive_in()
+    public void The_movement_does_not_depend_on_the_order_the_leagues_arrive_in()
     {
-        var tier1 = Clubs("t1", 18);
-        var tier2 = Clubs("t2", 18);
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top);
 
-        var ascending = PromotionRelegation.Compute([Tier(1, tier1), Tier(2, tier2)]);
-        var shuffled = PromotionRelegation.Compute([Tier(2, tier2), Tier(1, tier1)]);
+        var ascending = PromotionRelegation.Compute([top.Standings, second.Standings], []);
+        var shuffled = PromotionRelegation.Compute([second.Standings, top.Standings], []);
 
         shuffled.Should().BeEquivalentTo(ascending);
     }
 
     [Fact]
-    public void A_club_that_appears_in_two_tiers_is_a_programming_error()
+    public void Every_club_has_exactly_one_placement()
+    {
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top);
+        var challenger = second.Clubs[2];
+
+        var movements = PromotionRelegation.Compute(
+            [top.Standings, second.Standings],
+            Bracket(top, second, challenger, second.Clubs[3], challenger, top.Clubs[13]));
+
+        movements.Select(movement => movement.ClubId).Should().OnlyHaveUniqueItems();
+        movements.Select(movement => movement.ClubId).Should().BeEquivalentTo([.. top.Clubs, .. second.Clubs]);
+    }
+
+    [Fact]
+    public void A_club_that_appears_in_two_leagues_is_a_programming_error()
     {
         // A club has exactly one placement per season (PR-3); two placements would move it twice.
-        var shared = Guid.CreateVersion7();
-        var tier1 = new List<Guid> { shared }.Concat(Clubs("t1", 17)).ToList();
-        var tier2 = new List<Guid> { shared }.Concat(Clubs("t2", 17)).ToList();
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top, shared: top.Clubs[0]);
 
-        var act = () => PromotionRelegation.Compute([Tier(1, tier1), Tier(2, tier2)]);
-
-        act.Should().Throw<ArgumentException>();
-    }
-
-    [Fact]
-    public void A_tier_too_small_to_exchange_three_is_a_programming_error()
-    {
-        var tier1 = Clubs("t1", 18);
-        var tier2 = Clubs("t2", 2);
-
-        var act = () => PromotionRelegation.Compute([Tier(1, tier1), Tier(2, tier2)]);
+        var act = () => PromotionRelegation.Compute([top.Standings, second.Standings], []);
 
         act.Should().Throw<ArgumentException>();
     }
 
     [Fact]
-    public void No_tiers_moves_nobody()
+    public void A_league_too_small_to_exchange_two_is_a_programming_error()
     {
-        PromotionRelegation.Compute([]).Should().BeEmpty();
+        var top = League(1, 16);
+        var second = League(2, 1, parent: top);
+
+        var act = () => PromotionRelegation.Compute([top.Standings, second.Standings], []);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void A_semi_final_with_no_final_is_an_error_not_a_direct_only_season()
+    {
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top);
+        PlayoffOutcome[] semiOnly =
+        [
+            new(top.DivisionId, second.DivisionId, PlayoffStage.SemiFinal, second.Clubs[2], second.Clubs[3]),
+        ];
+
+        var act = () => PromotionRelegation.Compute([top.Standings, second.Standings], semiOnly);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void A_final_that_the_wrong_clubs_played_is_an_error()
+    {
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top);
+
+        // The 5th of the lower league cannot be in the final.
+        var act = () => PromotionRelegation.Compute(
+            [top.Standings, second.Standings],
+            Bracket(top, second, second.Clubs[4], second.Clubs[3], second.Clubs[4], top.Clubs[13]));
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void An_outcome_for_leagues_that_are_not_a_pair_is_an_error()
+    {
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top);
+        PlayoffOutcome[] stray =
+        [
+            new(second.DivisionId, top.DivisionId, PlayoffStage.Final, top.Clubs[0], second.Clubs[0]),
+        ];
+
+        var act = () => PromotionRelegation.Compute([top.Standings, second.Standings], stray);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Validate_rejects_a_league_with_two_feeders()
+    {
+        var top = League(1, 16);
+        var secondA = League(2, 16, parent: top, number: 1);
+        var secondB = League(2, 16, parent: top, number: 2);
+
+        var problems = PromotionRelegation.Validate([top.Standings, secondA.Standings, secondB.Standings]);
+        var act = () => PromotionRelegation.Compute([top.Standings, secondA.Standings, secondB.Standings], []);
+
+        problems.Should().Contain(problem => problem.Contains("feeder"));
+        problems.Should().Contain(problem => problem.Contains("Tier 2 holds 2 leagues"));
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Validate_accepts_a_one_league_per_tier_pyramid()
+    {
+        var top = League(1, 16);
+        var second = League(2, 16, parent: top);
+        var third = League(3, 16, parent: second);
+
+        PromotionRelegation.Validate([top.Standings, second.Standings, third.Standings]).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void No_leagues_moves_nobody()
+    {
+        PromotionRelegation.Compute([], []).Should().BeEmpty();
     }
 
     [Fact]
     public void The_version_names_the_rule()
     {
-        PromotionRelegation.Version.Should().Be("promotion-relegation-v1");
+        PromotionRelegation.Version.Should().Be("promotion-relegation-v2");
     }
 
-    private static TierStandings Tier(int number, IReadOnlyList<Guid> clubs) => new(number, clubs);
+    private static int PerLeague(IReadOnlyList<ClubMovement> movements, TestLeague league) =>
+        movements.Count(movement => movement.ToDivisionId == league.DivisionId);
 
     private static ClubMovement MovementOf(IReadOnlyList<ClubMovement> movements, Guid clubId) =>
         movements.Single(movement => movement.ClubId == clubId);
 
-    private static List<Guid> Clubs(string prefix, int count)
+    private static PlayoffOutcome[] Bracket(
+        TestLeague parent,
+        TestLeague feeder,
+        Guid semiWinner,
+        Guid semiLoser,
+        Guid finalWinner,
+        Guid finalLoser) =>
+    [
+        new(parent.DivisionId, feeder.DivisionId, PlayoffStage.SemiFinal, semiWinner, semiLoser),
+        new(parent.DivisionId, feeder.DivisionId, PlayoffStage.Final, finalWinner, finalLoser),
+    ];
+
+    private static TestLeague League(int tier, int count, TestLeague? parent = null, int number = 1, Guid? shared = null)
     {
+        var divisionId = new Guid(tier, (short)number, 0, new byte[8]);
         var clubs = new List<Guid>(count);
 
         for (var index = 0; index < count; index++)
         {
             // Deterministic, distinct ids so a test failure names a club by its tier and position.
-            var bytes = new byte[16];
-            bytes[0] = (byte)prefix[^1];
-            bytes[1] = (byte)index;
-            clubs.Add(new Guid(bytes));
+            clubs.Add(new Guid(0, (short)tier, (short)number, [(byte)index, 0, 0, 0, 0, 0, 0, 0]));
         }
 
-        return clubs;
+        if (shared is not null)
+        {
+            clubs[0] = shared.Value;
+        }
+
+        return new TestLeague(divisionId, clubs, new LeagueStandings(divisionId, tier, number, parent?.DivisionId, clubs));
     }
+
+    private sealed record TestLeague(Guid DivisionId, List<Guid> Clubs, LeagueStandings Standings);
 }

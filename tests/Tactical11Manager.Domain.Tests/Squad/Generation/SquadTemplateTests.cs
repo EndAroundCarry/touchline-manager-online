@@ -386,7 +386,7 @@ public sealed class SquadTemplateTests
         SquadTemplate.Version.Should().NotBeNullOrWhiteSpace();
         PlayerGenerator.Version.Should().Be("player-gen-v4");
         SquadTemplate.Version.Should().Be("squad-template-v2");
-        WorldRuleSet.Version.Should().Be("world-rules-v20");
+        WorldRuleSet.Version.Should().Be("world-rules-v21");
     }
 
     private static int StrengthOf(IReadOnlyList<GeneratedSquadMember> squad) =>

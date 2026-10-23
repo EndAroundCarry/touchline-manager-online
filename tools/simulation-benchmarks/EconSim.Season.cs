@@ -111,8 +111,15 @@ internal sealed partial class EconSim
             club.FirstSeason = false;
         }
 
+        // One league per tier, so a tier's division identity is its number. Until the play-off is simulated (milestone 5) only the direct places move.
         var movements = PromotionRelegation.Compute(
-            [.. Enumerable.Range(1, Tiers).Select(tier => new TierStandings(tier, [.. Table(tier).Select(club => club.Guid)]))]);
+            [.. Enumerable.Range(1, Tiers).Select(tier => new LeagueStandings(
+                TierDivisionId(tier),
+                tier,
+                1,
+                tier == 1 ? null : TierDivisionId(tier - 1),
+                [.. Table(tier).Select(club => club.Guid)]))],
+            []);
         var byGuid = Clubs.ToDictionary(club => club.Guid);
 
         var nextTier = movements.ToDictionary(movement => movement.ClubId, movement => movement.ToTier);
@@ -135,6 +142,9 @@ internal sealed partial class EconSim
 
         RolloverSquads();
     }
+
+    // The simulation has one league per tier, so a tier's number is its division's identity.
+    private static Guid TierDivisionId(int tier) => new(tier, 0, 0, new byte[8]);
 
     private ClubSeasonRow MakeRow(SimClub club, ObjectiveOutcome outcome) => new(
         Seed,

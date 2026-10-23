@@ -127,6 +127,48 @@ public sealed class SeasonCalendarTests
         sundays.Should().Be(WorldRuleSet.SeasonCycleWeeks);
     }
 
+    [Theory]
+    [InlineData(DayOfWeek.Tuesday)]
+    [InlineData(DayOfWeek.Thursday)]
+    [InlineData(DayOfWeek.Sunday)]
+    public void The_play_off_slots_follow_matchday_thirty_and_end_before_the_next_season(DayOfWeek weekday)
+    {
+        var first = SeasonCalendar.FirstMatchdayOnOrAfter(new DateOnly(2026, 10, 1));
+
+        while (first.DayOfWeek != weekday)
+        {
+            first = SeasonCalendar.FirstMatchdayOnOrAfter(first.AddDays(1));
+        }
+
+        var window = SeasonCalendar.Window(first);
+        var slots = SeasonCalendar.PlayoffKickoffs(first);
+
+        slots.Should().HaveCount(WorldRuleSet.PlayoffSlots);
+        slots.Should().BeInAscendingOrder();
+        slots[0].Should().BeAfter(window.EndsAt);
+        slots[^1].Should().BeBefore(window.RolloverEndsAt);
+        slots.Should().OnlyContain(slot => slot.Hour == 19 && slot.Offset == TimeSpan.Zero);
+        slots.Should().OnlyContain(slot => SeasonCalendar.IsMatchday(DateOnly.FromDateTime(slot.UtcDateTime)));
+    }
+
+    [Fact]
+    public void For_a_tuesday_season_the_play_offs_are_on_days_70_72_and_75()
+    {
+        var first = SeasonCalendar.FirstMatchdayOnOrAfter(new DateOnly(2026, 10, 1));
+
+        while (first.DayOfWeek != DayOfWeek.Tuesday)
+        {
+            first = SeasonCalendar.FirstMatchdayOnOrAfter(first.AddDays(1));
+        }
+
+        var slots = SeasonCalendar.PlayoffKickoffs(first);
+        var start = SeasonCalendar.KickoffAt(first);
+
+        (slots[0] - start).TotalDays.Should().Be(70);
+        (slots[1] - start).TotalDays.Should().Be(72);
+        (slots[2] - start).TotalDays.Should().Be(75);
+    }
+
     [Fact]
     public void Kickoff_is_the_standard_utc_time_with_an_explicit_zero_offset()
     {

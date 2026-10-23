@@ -174,6 +174,41 @@ public sealed class FixtureAndMatchdayTests
     }
 
     [Fact]
+    public void A_league_matchday_is_a_league_round()
+    {
+        var matchday = Matchday.Schedule(Guid.CreateVersion7(), Guid.CreateVersion7(), 30, Now, Now);
+
+        matchday.Kind.Should().Be(MatchdayKind.League);
+    }
+
+    [Theory]
+    [InlineData(1, 31)]
+    [InlineData(2, 32)]
+    [InlineData(3, 33)]
+    public void A_play_off_matchday_sits_after_the_thirty_league_rounds(int slot, int expectedRound)
+    {
+        var division = Guid.CreateVersion7();
+
+        var matchday = Matchday.SchedulePlayoff(Guid.CreateVersion7(), division, slot, Now, Now);
+
+        matchday.Kind.Should().Be(MatchdayKind.Playoff);
+        matchday.RoundNumber.Should().Be(expectedRound);
+        matchday.DivisionSeasonId.Should().Be(division);
+        matchday.LockAt.Should().Be(Now.AddMinutes(-WorldRuleSet.TeamSheetLockMinutes));
+        matchday.PublicationStatus.Should().Be(MatchdayPublicationStatus.Pending);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(WorldRuleSet.PlayoffSlots + 1)]
+    public void A_play_off_slot_must_be_one_of_the_three(int slot)
+    {
+        var act = () => Matchday.SchedulePlayoff(Guid.CreateVersion7(), Guid.CreateVersion7(), slot, Now, Now);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
     public void A_matchday_publishes_only_once_every_fixture_has_staged()
     {
         var matchday = Matchday.Schedule(Guid.CreateVersion7(), Guid.CreateVersion7(), 1, Now, Now);

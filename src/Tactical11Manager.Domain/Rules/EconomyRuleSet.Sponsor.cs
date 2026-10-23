@@ -32,8 +32,8 @@ public static partial class EconomyRuleSet
     /// <summary>The place the eleventh-place objective asks for: five places above the bottom, so the last of the middle of the table.</summary>
     public const int EleventhPlace = ClubsPerDivision - 5;
 
-    /// <summary>The place the stay-up objective asks for: the last place that is not relegated.</summary>
-    public const int StayUpPlace = ClubsPerDivision - WorldRuleSet.RelegatedPerTier;
+    /// <summary>The place the stay-up objective asks for: the last place above the play-off place, so the play-off place does not count as staying up.</summary>
+    public const int StayUpPlace = ClubsPerDivision - WorldRuleSet.DirectRelegationPlaces - 1;
 
     /// <summary>The place a season objective asks for.</summary>
     /// <param name="objective">The objective.</param>

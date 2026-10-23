@@ -24,8 +24,15 @@ public sealed class WorldRuleSetTests
         WorldRuleSet.KickoffUtc.Should().Be(new TimeOnly(19, 0), "CAL-2");
         WorldRuleSet.TeamSheetLockMinutes.Should().Be(30, "CAL-3");
         WorldRuleSet.RolloverDays.Should().Be(7, "CAL-6");
-        WorldRuleSet.PromotedPerTier.Should().Be(3, "PR-1");
-        WorldRuleSet.RelegatedPerTier.Should().Be(3, "PR-1");
+        WorldRuleSet.DirectPromotionPlaces.Should().Be(2, "PR-1");
+        WorldRuleSet.DirectRelegationPlaces.Should().Be(2, "PR-1");
+        WorldRuleSet.PlayoffSemiHomePlace.Should().Be(3, "PR-1");
+        WorldRuleSet.PlayoffSemiAwayPlace.Should().Be(4, "PR-1");
+        WorldRuleSet.PlayoffHolderPlace.Should().Be(14, "PR-1");
+        WorldRuleSet.PlayoffSlots.Should().Be(3, "CAL-6");
+        WorldRuleSet.PlayoffSemiSlot.Should().Be(1, "CAL-6");
+        WorldRuleSet.PlayoffFinalSlot.Should().Be(2, "CAL-6");
+        WorldRuleSet.ShootoutRegulationKicks.Should().Be(5, "PR-6");
         WorldRuleSet.GeneratorSquadTarget.Should().Be(24, "SQ-1");
     }
 

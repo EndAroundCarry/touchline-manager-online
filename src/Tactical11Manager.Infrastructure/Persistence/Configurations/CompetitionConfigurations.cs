@@ -307,6 +307,9 @@ internal sealed class MatchdayConfiguration : IEntityTypeConfiguration<Matchday>
         builder.Property(matchday => matchday.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(matchday => matchday.Version).HasColumnName("version").IsRequired();
 
+        // Not stored yet: the kind column arrives with the play-off schema (milestone 3). Until then every row is a league round.
+        builder.Ignore(matchday => matchday.Kind);
+
         builder.HasIndex(matchday => new { matchday.DivisionSeasonId, matchday.RoundNumber })
             .IsUnique()
             .HasDatabaseName("ux_matchdays_division_season_id_round_number");

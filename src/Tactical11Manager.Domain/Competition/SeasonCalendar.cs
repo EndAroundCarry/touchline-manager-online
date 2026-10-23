@@ -84,6 +84,18 @@ public static class SeasonCalendar
     }
 
     /// <summary>
+    /// The kickoffs of the promotion play-off slots: the three matchday dates after matchday 30, which are Tuesday, Thursday and Sunday of
+    /// the week after the league season (`CAL-6`).
+    /// </summary>
+    /// <param name="firstMatchday">The season's first matchday, which must already be a matchday weekday.</param>
+    /// <returns>Slot 1 (the semi-finals), slot 2 (the finals) and slot 3 (kept for a late final or a longer bracket), in order.</returns>
+    public static IReadOnlyList<DateTimeOffset> PlayoffKickoffs(DateOnly firstMatchday) =>
+        MatchdayDates(firstMatchday, WorldRuleSet.MatchdaysPerSeason + WorldRuleSet.PlayoffSlots)
+            .Skip(WorldRuleSet.MatchdaysPerSeason)
+            .Select(KickoffAt)
+            .ToList();
+
+    /// <summary>
     /// Computes a season's window from its first matchday.
     /// </summary>
     /// <param name="firstMatchday">The first matchday, which must already be a matchday weekday.</param>
@@ -102,6 +114,14 @@ public static class SeasonCalendar
             throw new InvalidOperationException(
                 $"A {WorldRuleSet.SeasonCycleWeeks}-week cycle leaves less than {WorldRuleSet.RolloverDays} days "
                 + $"after the last matchday on {dates[^1]:yyyy-MM-dd} (CAL-6).");
+        }
+
+        var lastPlayoffAt = PlayoffKickoffs(firstMatchday)[^1];
+
+        if (lastPlayoffAt >= rolloverEndsAt)
+        {
+            throw new InvalidOperationException(
+                $"The last play-off slot on {lastPlayoffAt:yyyy-MM-dd} is not before the next season's start (CAL-6).");
         }
 
         return new SeasonWindow(startsAt, endsAt, rolloverEndsAt, dates);

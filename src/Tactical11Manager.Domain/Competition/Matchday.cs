@@ -32,8 +32,11 @@ public sealed class Matchday
     /// <summary>Gets the division-season this round belongs to.</summary>
     public Guid DivisionSeasonId { get; private set; }
 
-    /// <summary>Gets the round number, 1-based within the season (`CAL-1`).</summary>
+    /// <summary>Gets the round number, 1-based within the season (`CAL-1`). A play-off sits at 30 plus its slot.</summary>
     public int RoundNumber { get; private set; }
+
+    /// <summary>Gets what the round is for: a league round, or a promotion play-off hosted in the division-season (`PR-4`).</summary>
+    public MatchdayKind Kind { get; private set; }
 
     /// <summary>Gets when team sheets lock for this round (`CAL-3`).</summary>
     public DateTimeOffset LockAt { get; private set; }
@@ -74,6 +77,39 @@ public sealed class Matchday
             Id = id,
             DivisionSeasonId = divisionSeasonId,
             RoundNumber = roundNumber,
+            Kind = MatchdayKind.League,
+            LockAt = kickoffAt.AddMinutes(-WorldRuleSet.TeamSheetLockMinutes),
+            KickoffAt = kickoffAt,
+            PublicationStatus = MatchdayPublicationStatus.Pending,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Version = 1,
+        };
+    }
+
+    /// <summary>Schedules a promotion play-off round in a division-season, after the league's thirty rounds (`PR-4`).</summary>
+    /// <param name="id">A server-generated identity.</param>
+    /// <param name="divisionSeasonId">The host's division-season: the lower league's for a semi-final, the higher league's for the final.</param>
+    /// <param name="slot">The kickoff slot after matchday 30, 1 to <see cref="WorldRuleSet.PlayoffSlots"/>.</param>
+    /// <param name="kickoffAt">The kickoff instant, in UTC.</param>
+    /// <param name="now">The current instant.</param>
+    /// <remarks>The round number is 30 plus the slot, so a play-off round never collides with a league round.</remarks>
+    public static Matchday SchedulePlayoff(
+        Guid id,
+        Guid divisionSeasonId,
+        int slot,
+        DateTimeOffset kickoffAt,
+        DateTimeOffset now)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(slot, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(slot, WorldRuleSet.PlayoffSlots);
+
+        return new Matchday
+        {
+            Id = id,
+            DivisionSeasonId = divisionSeasonId,
+            RoundNumber = WorldRuleSet.MatchdaysPerSeason + slot,
+            Kind = MatchdayKind.Playoff,
             LockAt = kickoffAt.AddMinutes(-WorldRuleSet.TeamSheetLockMinutes),
             KickoffAt = kickoffAt,
             PublicationStatus = MatchdayPublicationStatus.Pending,

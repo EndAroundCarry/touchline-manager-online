@@ -13,6 +13,7 @@ namespace Tactical11Manager.Application.Competition;
 /// <param name="RankedClubIds">The tier's clubs, best first, exactly as the finalized table ranks them (`TBL-12`).</param>
 /// <param name="Entries">The division-season's club entries, closed by the finalize phase (`PR-4`).</param>
 /// <param name="LeagueNumber">The league's number within its tier; its next season's seeds are derived from it.</param>
+/// <param name="ParentDivisionId">The league of the tier above that this league feeds, or <see langword="null"/> for the top division.</param>
 public sealed record RolloverTier(
     int TierNumber,
     Guid DivisionId,
@@ -20,7 +21,8 @@ public sealed record RolloverTier(
     DivisionSeason DivisionSeason,
     IReadOnlyList<Guid> RankedClubIds,
     IReadOnlyList<ClubSeasonEntry> Entries,
-    int LeagueNumber = 1)
+    int LeagueNumber = 1,
+    Guid? ParentDivisionId = null)
 {
     /// <summary>The 1-based final position of a club, from the row the projection stored (`TBL-12`).</summary>
     public int RankOf(Guid clubId)
@@ -131,7 +133,8 @@ public sealed class SeasonRolloverPlanLoader
                     divisionSeason,
                     ranked,
                     entries,
-                    division.LeagueNumber));
+                    division.LeagueNumber,
+                    division.ParentDivisionId));
             }
 
             plan.Add(new RolloverCountry(country.Id, country.Code, country.DisplayName, tiers));
@@ -204,10 +207,24 @@ public sealed class SeasonRolloverPlanLoader
         return reconciliations;
     }
 
-    /// <summary>Projects a country's active tiers into the shape the movement rule reads (`PR-1`).</summary>
+    /// <summary>Projects a country's active leagues into the shape the movement rule reads (`PR-1`).</summary>
     /// <param name="country">The country.</param>
-    public static List<TierStandings> ToTiers(RolloverCountry country) =>
+    public static List<LeagueStandings> ToLeagues(RolloverCountry country) =>
         country.Tiers
-            .Select(tier => new TierStandings(tier.TierNumber, tier.RankedClubIds))
+            .Select(tier => new LeagueStandings(
+                tier.DivisionId,
+                tier.TierNumber,
+                tier.LeagueNumber,
+                tier.ParentDivisionId,
+                tier.RankedClubIds))
             .ToList();
+
+    /// <summary>Computes every club's movement in a country (`PR-1`).</summary>
+    /// <param name="country">The country.</param>
+    /// <remarks>
+    /// Until the play-off pipeline stores its results (milestone 4 and 5), no bracket is played, so only the direct places
+    /// move: the 1st and 2nd go up and the 15th and 16th go down.
+    /// </remarks>
+    public static IReadOnlyList<ClubMovement> MovementsOf(RolloverCountry country) =>
+        PromotionRelegation.Compute(ToLeagues(country), []);
 }

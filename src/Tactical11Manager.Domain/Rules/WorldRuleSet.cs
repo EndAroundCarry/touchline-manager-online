@@ -35,6 +35,8 @@ namespace Tactical11Manager.Domain.Rules;
 /// (<see cref="Squad.Generation.SquadTemplate"/>) and tier 2 exist from the first season.
 /// The growing pyramid milestone made a country add a league once only 30 per cent of its clubs are free, and doubled the
 /// leagues of each tier (<see cref="World.PyramidShape"/>).
+/// The promotion play-off milestone replaced the three-up-three-down straight line with two up, two down and a play-off
+/// for the third place (`PR-1`).
 /// Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
 /// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
@@ -42,7 +44,7 @@ namespace Tactical11Manager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v20";
+    public const string Version = "world-rules-v21";
 
     /// <summary>Every active division holds exactly 16 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 16;
@@ -114,11 +116,32 @@ public static class WorldRuleSet
     /// </summary>
     public const int RolloverDays = 7;
 
-    /// <summary>Clubs promoted from a lower tier at rollover (`PR-1`).</summary>
-    public const int PromotedPerTier = 3;
+    /// <summary>Clubs that go up from a lower league at rollover without a play-off: its 1st and 2nd (`PR-1`).</summary>
+    public const int DirectPromotionPlaces = 2;
 
-    /// <summary>Clubs relegated from a higher tier at rollover (`PR-1`).</summary>
-    public const int RelegatedPerTier = 3;
+    /// <summary>Clubs that go down from a higher league at rollover without a play-off: its 15th and 16th (`PR-1`).</summary>
+    public const int DirectRelegationPlaces = 2;
+
+    /// <summary>The place in the lower league that hosts the play-off semi-final: 3rd (`PR-1`).</summary>
+    public const int PlayoffSemiHomePlace = 3;
+
+    /// <summary>The place in the lower league that visits the play-off semi-final: 4th (`PR-1`).</summary>
+    public const int PlayoffSemiAwayPlace = 4;
+
+    /// <summary>The place in the higher league that defends its spot in the play-off final: 14th, the last above the direct relegation places (`PR-1`).</summary>
+    public const int PlayoffHolderPlace = ClubsPerDivision - DirectRelegationPlaces;
+
+    /// <summary>The kickoff slots after matchday 30 that a play-off may use: Tuesday, Thursday and Sunday of the last week (`CAL-6`).</summary>
+    public const int PlayoffSlots = 3;
+
+    /// <summary>The slot the play-off semi-final is played in (`CAL-6`).</summary>
+    public const int PlayoffSemiSlot = 1;
+
+    /// <summary>The slot the play-off final is played in (`CAL-6`).</summary>
+    public const int PlayoffFinalSlot = 2;
+
+    /// <summary>The kicks each side takes in a penalty shoot-out before it goes to sudden death (`PR-6`).</summary>
+    public const int ShootoutRegulationKicks = 5;
 
     /// <summary>Days without a login before an inactivity warning is sent (`OCC-1`).</summary>
     public static readonly TimeSpan InactivityWarningAfter = TimeSpan.FromDays(10);

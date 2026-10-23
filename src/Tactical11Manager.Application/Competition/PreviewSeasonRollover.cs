@@ -170,8 +170,8 @@ public sealed class PreviewSeasonRollover
 
         foreach (var country in plan.Countries)
         {
-            var countryMovements = PromotionRelegation
-                .Compute(SeasonRolloverPlanLoader.ToTiers(country))
+            var countryMovements = SeasonRolloverPlanLoader
+                .MovementsOf(country)
                 .Select(movement => new SeasonRolloverMovement(
                     movement.ClubId,
                     movement.FromTier,
