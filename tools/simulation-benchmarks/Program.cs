@@ -22,6 +22,9 @@ using Tactical11Manager.SimulationBenchmarks;
 // `tick` plays matches on the tick engine's loop (engine-v12, Milestone 8), whether or not it is the default engine yet, and
 // prints what they came to; with `--dump file` it writes the first match's film as the API would return it.
 //
+// `tickpenalty N seed` plays matches with low, middle and high outfield and goalkeeper ability and prints the tick engine's penalty
+// conversion beside the shoot-out formula's chance for the same takers and keepers (promotion play-off plan). Not part of `all`.
+//
 // `tickmotion N seed` reads how the tick engine's players and ball move (standing, stop-and-go, receiving, opponents on top of each
 // other) and how much of a move the film shows, from the recording alone (tick-film-v1, Milestone 0). Not part of `all`.
 //
@@ -304,6 +307,11 @@ if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") != "1")
 if (mode is "tickfk")
 {
     FreeKickProbe.Run(Math.Min(count, 600), seed, rules);
+}
+
+if (mode is "tickpenalty")
+{
+    PenaltyProbe.Run(Math.Min(count, 600), seed, rules);
 }
 
 if (mode is "tickfkgrid")
