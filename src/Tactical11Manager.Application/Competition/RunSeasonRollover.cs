@@ -714,7 +714,7 @@ public sealed partial class RunSeasonRollover
             return existing;
         }
 
-        var seeds = DivisionScheduleGenerator.SeedsFor(seed, country.Code, nextSeason.SequenceNumber, tier.TierNumber);
+        var seeds = DivisionScheduleGenerator.SeedsFor(seed, country.Code, nextSeason.SequenceNumber, tier.TierNumber, tier.LeagueNumber);
 
         var divisionSeason = DivisionSeason.Create(
             Guid.CreateVersion7(),

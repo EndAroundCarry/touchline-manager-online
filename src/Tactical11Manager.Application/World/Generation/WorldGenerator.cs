@@ -14,8 +14,8 @@ using Tactical11Manager.Domain.World.Generation;
 
 namespace Tactical11Manager.Application.World.Generation;
 
-/// <summary>What to generate for one tier.</summary>
-/// <param name="Seed">The generation seed (`PYR-14`).</param>
+/// <summary>What to generate for one league.</summary>
+/// <param name="Seed">The generation seed (`PYR-14`); per league, so a retried request reproduces the same league.</param>
 /// <param name="WorldSeed">
 /// The world's own generation seed, used only for club identity. It is deliberately separate from
 /// <paramref name="Seed"/>: a provisioned tier's <paramref name="Seed"/> is per-tier (so a retried request
@@ -124,6 +124,7 @@ public sealed class WorldGenerator
 
         var country = request.Country;
         var tier = request.Tier;
+        var leagueNumber = request.LeagueNumber;
         var season = request.Season;
         var seed = request.Seed;
 
@@ -166,7 +167,8 @@ public sealed class WorldGenerator
             country.NamePoolKey,
             country.Code,
             tier,
-            WorldRuleSet.ClubsPerDivision);
+            WorldRuleSet.ClubsPerDivision,
+            leagueNumber);
 
         // The club ids are collected in the order their identities were generated, which is the only stable
         // order for the schedule to be reproducible from: ids are UUIDv7 and differ per run, so the fixture
@@ -225,13 +227,13 @@ public sealed class WorldGenerator
                     WorldRuleSet.OpeningCashMinorForTier(tier)),
                 now));
 
-            // The ordinal is the club's position within its country, tier-adjusted, matching the ordinal its
-            // identity was generated with, so a provisioned tier's squads are distinct from tier 1's.
+            // The ordinal is the club's position within its country, league-adjusted, matching the ordinal its
+            // identity was generated with, so a provisioned league's squads are distinct from every other league's.
             var (squadSize, strength) = AddSquad(
                 seed,
                 country,
                 clubId,
-                ((tier - 1) * WorldRuleSet.ClubsPerDivision) + clubIds.Count,
+                (PyramidShape.LeagueOrdinal(tier, leagueNumber) * WorldRuleSet.ClubsPerDivision) + clubIds.Count,
                 tier,
                 season,
                 now);

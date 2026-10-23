@@ -227,24 +227,32 @@ public sealed class ClubClaimTests : WorldTestBase
     }
 
     [Fact]
-    public async Task Filling_a_country_creates_exactly_one_provisioning_request_and_then_refuses_with_capacity()
+    public async Task Claiming_down_to_thirty_per_cent_free_requests_the_next_league_once_and_a_full_country_then_refuses()
     {
-        // PYR-2 and PYR-10: the manager who takes the last club of tiers 1 and 2 triggers tier 3; the next is
-        // told to wait rather than told to pick another club that does not exist.
+        // PYR-2 and PYR-10: the 23rd manager of 32 leaves 9 clubs free, which is 30 per cent, so division 2.2 is requested
+        // then and not a claim sooner; the claims carry on while it builds, and once the country is full the next manager
+        // is told to wait rather than told to pick another club that does not exist.
         var countryId = CountryId("GER");
 
         await using (var scope = Fixture.CreateScope())
         {
+            var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
             var clubIds = await ClubIdsOfAsync(scope, countryId, CancellationToken.None);
 
             clubIds.Should().HaveCount(WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision);
 
-            foreach (var clubId in clubIds)
+            for (var index = 0; index < clubIds.Count; index++)
             {
                 var userId = await CreateManagerAsync(scope, CancellationToken.None);
-                var result = await ClaimAsync(scope, userId, clubId, NewKey());
+                var result = await ClaimAsync(scope, userId, clubIds[index], NewKey());
 
                 result.Outcome.Should().Be(ClaimClubOutcome.Claimed);
+
+                var requested = await db.DivisionProvisioningRequests.CountAsync(request => request.CountryId == countryId);
+
+                requested.Should().Be(
+                    index + 1 >= 23 ? 1 : 0,
+                    $"after claim {index + 1} of 32: free clubs fall to 9, the 30 per cent trigger, at the 23rd");
             }
         }
 
@@ -258,8 +266,9 @@ public sealed class ClubClaimTests : WorldTestBase
 
             requests.Should().HaveCount(
                 1,
-                "unique (country_id, target_tier) plus the country lock decides this, not the caller's timing");
-            requests[0].TargetTier.Should().Be(WorldRuleSet.SeededTiers + 1);
+                "one request in flight per country: the nine claims after the trigger queue nothing more");
+            requests[0].TargetTier.Should().Be(WorldRuleSet.SeededTiers);
+            requests[0].TargetLeagueNumber.Should().Be(2, "PYR-15: the second league of tier 2 comes first");
             requests[0].Status.Should().Be(ProvisioningRequestStatus.Requested);
 
             var capacity = await scope.ServiceProvider
@@ -282,11 +291,11 @@ public sealed class ClubClaimTests : WorldTestBase
 
             refused.Outcome.Should().Be(ClaimClubOutcome.CapacityProvisioning);
             refused.Provisioning.Should().NotBeNull();
-            refused.Provisioning!.TargetTier.Should().Be(WorldRuleSet.SeededTiers + 1);
+            refused.Provisioning!.TargetTier.Should().Be(WorldRuleSet.SeededTiers);
             refused.Dashboard.Should().BeNull("PYR-10 forbids partially assigning a club");
 
             (await db.DivisionProvisioningRequests.CountAsync(request => request.CountryId == countryId))
-                .Should().Be(1, "a refusal must not queue a second tier");
+                .Should().Be(1, "a refusal must not queue a second league");
         }
     }
 

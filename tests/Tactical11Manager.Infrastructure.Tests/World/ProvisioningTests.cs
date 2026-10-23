@@ -204,6 +204,101 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task Leagues_provisioned_in_creation_order_each_hold_sixteen_clubs_with_their_own_names_and_seeds()
+    {
+        // PYR-15: 2.2 comes first, then 3.1 under 2.1 and 3.2 under 2.2. Club names, squads and schedule seeds are drawn per
+        // league, so no two leagues of a country share any.
+        Guid countryId;
+        Guid seasonId;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+            var world = await db.GameWorlds.SingleAsync();
+
+            seasonId = (await db.Seasons.SingleAsync(candidate => candidate.WorldId == world.Id)).Id;
+            countryId = await db.Countries.OrderBy(country => country.SortOrder).Select(c => c.Id).FirstAsync();
+        }
+
+        foreach (var (tier, league) in new[] { (2, 2), (3, 1), (3, 2) })
+        {
+            await using var scope = _fixture.CreateScope();
+
+            // Each request is made once its parent league exists, as it is in a growing country.
+            var requestId = await CreateRequestAsync(scope, countryId, tier, seasonId, league);
+
+            var result = await scope.ServiceProvider.GetRequiredService<ProvisionDivision>()
+                .ExecuteAsync(requestId, CancellationToken.None);
+
+            result.Outcome.Should().Be(ProvisionDivisionOutcome.Completed);
+            result.Clubs.Should().Be(WorldRuleSet.ClubsPerDivision);
+        }
+
+        await using var verify = _fixture.CreateScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var divisions = await verifyDb.Divisions
+            .Where(division => division.CountryId == countryId)
+            .OrderBy(division => division.TierNumber).ThenBy(division => division.LeagueNumber)
+            .ToListAsync();
+
+        divisions.Select(division => (division.TierNumber, division.LeagueNumber))
+            .Should().Equal([(1, 1), (2, 1), (2, 2), (3, 1), (3, 2)]);
+        divisions.Should().OnlyContain(division => division.Status == DivisionStatus.Active);
+        divisions.Select(division => division.DisplayName.Split(' ', 2)[1]).Should().Equal(
+            ["Top Division", "Division 2.1", "Division 2.2", "Division 3.1", "Division 3.2"]);
+
+        Guid ParentOf(int tier, int league) =>
+            divisions.Single(division => division.TierNumber == tier && division.LeagueNumber == league).ParentDivisionId!.Value;
+
+        Guid IdOf(int tier, int league) =>
+            divisions.Single(division => division.TierNumber == tier && division.LeagueNumber == league).Id;
+
+        ParentOf(2, 2).Should().Be(IdOf(1, 1));
+        ParentOf(3, 1).Should().Be(IdOf(2, 1), "3.1 is the first feeder of 2.1");
+        ParentOf(3, 2).Should().Be(IdOf(2, 2), "3.2 is the first feeder of 2.2");
+
+        var divisionSeasons = await verifyDb.DivisionSeasons
+            .Where(divisionSeason => divisions.Select(division => division.Id).Contains(divisionSeason.DivisionId))
+            .ToListAsync();
+
+        divisionSeasons.Select(divisionSeason => divisionSeason.ScheduleSeed)
+            .Should().OnlyHaveUniqueItems("a league of a country draws its own fixture list");
+        divisionSeasons.Select(divisionSeason => divisionSeason.TieDrawSeed).Should().OnlyHaveUniqueItems();
+
+        foreach (var division in divisions)
+        {
+            var divisionSeasonId = divisionSeasons.Single(divisionSeason => divisionSeason.DivisionId == division.Id).Id;
+
+            (await verifyDb.ClubSeasonEntries.CountAsync(entry => entry.DivisionSeasonId == divisionSeasonId))
+                .Should().Be(WorldRuleSet.ClubsPerDivision, division.DisplayName);
+        }
+
+        var names = await verifyDb.Clubs
+            .Where(club => club.CountryId == countryId)
+            .Select(club => club.NormalizedName)
+            .ToListAsync();
+
+        names.Should().HaveCount(divisions.Count * WorldRuleSet.ClubsPerDivision);
+        names.Should().OnlyHaveUniqueItems("PYR-11: the league ordinals keep every league's names apart");
+
+        // The squads follow the same ordinals, so the players of two leagues are different people.
+        var playerSeeds = await verifyDb.PlayerContracts
+            .Where(contract => verifyDb.Clubs.Any(club => club.Id == contract.ClubId && club.CountryId == countryId))
+            .Join(verifyDb.Players, contract => contract.PlayerId, player => player.Id, (_, player) => player.NameSeed)
+            .ToListAsync();
+
+        playerSeeds.Should().OnlyHaveUniqueItems("SQ-1: no two leagues share a squad's players");
+
+        await using var onboarding = _fixture.CreateScope();
+
+        var capacity = await onboarding.ServiceProvider.GetRequiredService<IOnboardingQueries>()
+            .GetCountryCapacityAsync(countryId, CancellationToken.None);
+
+        capacity!.ClubsInCountry.Should().Be(5 * WorldRuleSet.ClubsPerDivision, "PYR-1: every active league counts");
+    }
+
+    [Fact]
     public async Task Provisioning_names_a_new_tier_from_the_world_seed_so_it_cannot_collide()
     {
         // ADR-0033: club identity is seeded from the world seed, not from the per-tier provisioning request
@@ -348,16 +443,19 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
         AsyncServiceScope scope,
         Guid countryId,
         int targetTier,
-        Guid seasonId)
+        Guid seasonId,
+        int targetLeague = 1)
     {
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
         var repository = scope.ServiceProvider.GetRequiredService<IDivisionProvisioningRequestRepository>();
         var now = DateTimeOffset.UtcNow;
 
+        var parentLeague = PyramidShape.ParentLeagueOf(targetTier, targetLeague);
+
         var parentId = await db.Divisions
             .Where(division => division.CountryId == countryId
                 && division.TierNumber == targetTier - 1
-                && division.LeagueNumber == 1)
+                && division.LeagueNumber == parentLeague)
             .Select(division => division.Id)
             .SingleAsync();
 
@@ -365,10 +463,10 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
             Guid.CreateVersion7(),
             countryId,
             targetTier,
-            targetLeagueNumber: 1,
+            targetLeague,
             parentId,
             seasonId,
-            $"provision-test-{countryId:N}-{targetTier}",
+            $"provision-test-{countryId:N}-{targetTier}.{targetLeague}",
             now);
 
         repository.Add(request);

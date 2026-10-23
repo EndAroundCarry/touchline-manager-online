@@ -99,6 +99,35 @@ public sealed class PyramidShapeTests
         }
     }
 
+    [Theory]
+    [InlineData(1, 1, 0)]
+    [InlineData(2, 1, 1)]
+    [InlineData(2, 2, 2)]
+    [InlineData(3, 1, 3)]
+    [InlineData(3, 4, 6)]
+    [InlineData(4, 1, 7)]
+    public void A_league_is_numbered_by_its_place_in_the_creation_order_of_the_country(int tier, int league, int ordinal)
+    {
+        PyramidShape.LeagueOrdinal(tier, league).Should().Be(ordinal);
+    }
+
+    [Fact]
+    public void The_league_ordinals_follow_the_creation_order_without_a_gap_or_a_repeat()
+    {
+        var existing = new List<(int Tier, int League)> { (1, 1) };
+        var ordinals = new List<int> { 0 };
+
+        for (var step = 0; step < 14; step++)
+        {
+            var next = PyramidShape.NextLeague(existing);
+
+            existing.Add((next.Tier, next.League));
+            ordinals.Add(PyramidShape.LeagueOrdinal(next.Tier, next.League));
+        }
+
+        ordinals.Should().Equal(Enumerable.Range(0, 15));
+    }
+
     [Fact]
     public void The_parent_in_a_created_league_is_the_one_the_parent_rule_gives()
     {

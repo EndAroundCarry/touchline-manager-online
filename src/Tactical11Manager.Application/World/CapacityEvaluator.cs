@@ -11,19 +11,19 @@ using Tactical11Manager.Domain.World.Generation;
 namespace Tactical11Manager.Application.World;
 
 /// <summary>
-/// Decides whether a country's pyramid should grow, and records the request when it should (`PYR-2`).
+/// Decides whether a country's pyramid should grow, and records the request when it should (`PYR-2`, `PYR-15`).
 /// </summary>
 /// <remarks>
 /// <para>
 /// Extracted from the takeover command because it is the one piece of that workflow with a rule of its
 /// own, and because Stage 11 runs exactly this evaluation when the provisioning worker finishes and when a
-/// tenure changes state. Two callers deciding "is this country full?" separately is how a product ends up
+/// tenure changes state. Two callers deciding "is it time to grow?" separately is how a product ends up
 /// with two different answers to it.
 /// </para>
 /// <para>
 /// <b>The caller must hold the country's advisory lock and be inside a transaction.</b> The evaluation
 /// reads a count and then writes a row that must not duplicate a peer's; without the lock, two takeovers
-/// can both see a full tier and both insert.
+/// can both see the free clubs at the trigger and both insert.
 /// </para>
 /// </remarks>
 public sealed class CapacityEvaluator
@@ -61,9 +61,11 @@ public sealed class CapacityEvaluator
     /// Creates the next league's provisioning request when the country needs one and none is in flight.
     /// </summary>
     /// <remarks>
-    /// A country grows one league at a time. A request that is still requested or running is returned as it
-    /// is, so a rush of claims never makes two overlapping requests; growth then chains through the re-check
-    /// after each activation (`PYR-2`, `PYR-11`).
+    /// A league is requested once the free clubs fall to <see cref="WorldRuleSet.ExpansionFreeClubsPercent"/> per cent of
+    /// the clubs in the active leagues, and it is the league <see cref="PyramidShape.NextLeague"/> names. A country grows
+    /// one league at a time: a request that is still requested or running is returned as it is, so a rush of claims never
+    /// makes two overlapping requests, and growth then chains through the re-check after each activation (`PYR-2`,
+    /// `PYR-11`).
     /// </remarks>
     /// <param name="countryId">The country to evaluate.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -90,9 +92,7 @@ public sealed class CapacityEvaluator
             capacity.HumanOccupiedClubs,
             capacity.Leagues);
 
-        // Until the provisioning worker builds leagues by number (milestone 3) a country still grows a tier at a
-        // time, once every club has a human manager, into league 1 of the tier below the lowest.
-        if (!rules.CountryIsFull)
+        if (!rules.NeedsExpansion)
         {
             return null;
         }
@@ -104,9 +104,8 @@ public sealed class CapacityEvaluator
             return inFlight.ToProvisioningResponse(_options.ProvisioningPollSeconds);
         }
 
-        var targetTier = capacity.LowestActiveTier + 1;
-        const int targetLeague = 1;
-        var existing = await _requests.FindAsync(countryId, targetTier, targetLeague, cancellationToken);
+        var target = rules.TargetLeague;
+        var existing = await _requests.FindAsync(countryId, target.Tier, target.League, cancellationToken);
 
         if (existing is not null)
         {
@@ -117,6 +116,17 @@ public sealed class CapacityEvaluator
         var country = await _world.FindCountryAsync(countryId, cancellationToken);
 
         if (world is null || country is null)
+        {
+            return null;
+        }
+
+        // The league it feeds is the one the shape names in the tier above; a league that is still provisioning has its
+        // division row already, so the parent is found whatever its status.
+        var parent = target.ParentLeague is { } parentLeague
+            ? await _world.FindDivisionByLeagueAsync(countryId, target.Tier - 1, parentLeague, cancellationToken)
+            : null;
+
+        if (parent is null)
         {
             return null;
         }
@@ -135,11 +145,11 @@ public sealed class CapacityEvaluator
         var request = DivisionProvisioningRequest.Request(
             Guid.CreateVersion7(),
             countryId,
-            targetTier,
-            targetLeague,
-            capacity.DivisionId,
+            target.Tier,
+            target.League,
+            parent.Id,
             season.Id,
-            GenerationSeedFor(world.Id, country.Code, targetTier),
+            GenerationSeedFor(world.Id, country.Code, target.Tier, target.League),
             now);
 
         _requests.Add(request);
@@ -152,7 +162,7 @@ public sealed class CapacityEvaluator
             request.Id,
             _requestContext.CorrelationId,
             IpHash: null,
-            Reason: $"{country.Code} tier {targetTier}"));
+            Reason: $"{country.Code} league {target.Tier}.{target.League}"));
 
         return request.ToProvisioningResponse(_options.ProvisioningPollSeconds);
     }
@@ -181,17 +191,25 @@ public sealed class CapacityEvaluator
     }
 
     /// <summary>
-    /// Derives the seed for a provisioned tier (`PYR-14`).
+    /// Derives the seed for a provisioned league (`PYR-14`).
     /// </summary>
     /// <remarks>
     /// Derived from the world's own identity and the country's stable code rather than from mutable state,
     /// so a retried provisioning run reuses the same seed. That is what keeps two attempts at the same
-    /// tier attempts at the same tier — the property <c>DivisionProvisioningRequest.Retry</c> depends on.
+    /// league attempts at the same league — the property <c>DivisionProvisioningRequest.Retry</c> depends on. The league
+    /// number is left out for the first league of a tier, so division 2.1's seed is what it was before a tier could hold
+    /// several, and every other league of the tier draws its own.
     /// </remarks>
-    internal static string GenerationSeedFor(Guid worldId, string countryCode, int targetTier) =>
-        DeterministicDigest.Of(
+    internal static string GenerationSeedFor(Guid worldId, string countryCode, int targetTier, int targetLeague = 1)
+    {
+        var tier = targetTier.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        return DeterministicDigest.Of(
             worldId.ToString(),
             countryCode,
-            targetTier.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            targetLeague == 1
+                ? tier
+                : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{tier}.{targetLeague}"),
             "provision");
+    }
 }

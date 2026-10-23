@@ -12,13 +12,15 @@ namespace Tactical11Manager.Application.Competition;
 /// <param name="DivisionSeason">The division's instance in the closing season.</param>
 /// <param name="RankedClubIds">The tier's clubs, best first, exactly as the finalized table ranks them (`TBL-12`).</param>
 /// <param name="Entries">The division-season's club entries, closed by the finalize phase (`PR-4`).</param>
+/// <param name="LeagueNumber">The league's number within its tier; its next season's seeds are derived from it.</param>
 public sealed record RolloverTier(
     int TierNumber,
     Guid DivisionId,
     string DivisionDisplayName,
     DivisionSeason DivisionSeason,
     IReadOnlyList<Guid> RankedClubIds,
-    IReadOnlyList<ClubSeasonEntry> Entries)
+    IReadOnlyList<ClubSeasonEntry> Entries,
+    int LeagueNumber = 1)
 {
     /// <summary>The 1-based final position of a club, from the row the projection stored (`TBL-12`).</summary>
     public int RankOf(Guid clubId)
@@ -128,7 +130,8 @@ public sealed class SeasonRolloverPlanLoader
                     division.DisplayName,
                     divisionSeason,
                     ranked,
-                    entries));
+                    entries,
+                    division.LeagueNumber));
             }
 
             plan.Add(new RolloverCountry(country.Id, country.Code, country.DisplayName, tiers));

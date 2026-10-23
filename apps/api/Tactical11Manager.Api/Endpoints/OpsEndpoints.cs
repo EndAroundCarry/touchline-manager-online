@@ -144,11 +144,13 @@ internal static class OpsEndpoints
         group
             .MapPost("/diagnostics/provision-division", ProvisionDivisionAsync)
             .WithName("ProvisionDivisionProbe")
-            .WithSummary("Creates a tier's provisioning request and enqueues its job, due now.")
+            .WithSummary("Creates the next league's provisioning request and enqueues its job, due now.")
             .WithDescription(
-                "Development and staging diagnostics only. The worker generates, backfills, validates, and "
-                + "activates the tier exactly as it would when a takeover fills one; this only does what the "
-                + "worker-only scheduler normally does, and a repeated call is a no-op.")
+                "Development and staging diagnostics only. The league is the one the pyramid creates next "
+                + "(2.1, 2.2, 3.1, 3.2 and so on). The worker generates, backfills, validates, and "
+                + "activates it exactly as it would when the free clubs fall to the trigger; this only does "
+                + "what the worker-only scheduler normally does, and a repeated call before the league is "
+                + "built is a no-op.")
             .Produces<ProvisioningTriggerResponse>(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -290,7 +292,7 @@ internal static class OpsEndpoints
         TriggerProvisioning trigger,
         CancellationToken cancellationToken)
     {
-        var result = await trigger.ExecuteAsync(request.CountryId, request.TargetTier, cancellationToken);
+        var result = await trigger.ExecuteAsync(request.CountryId, cancellationToken);
 
         return result.Outcome switch
         {
@@ -298,6 +300,7 @@ internal static class OpsEndpoints
                 new ProvisioningTriggerResponse(
                     result.CountryId,
                     result.TargetTier,
+                    result.TargetLeague,
                     result.RequestId,
                     result.BusinessKey,
                     result.Enqueued),
@@ -306,8 +309,8 @@ internal static class OpsEndpoints
             TriggerProvisioningOutcome.InvalidTier or TriggerProvisioningOutcome.NoSeason => ProblemResults.Code(
                 StatusCodes.Status400BadRequest,
                 WorldErrorCodes.ProvisioningTargetInvalid,
-                "The target tier cannot be provisioned.",
-                "Tier 1 is seeded; ask for a tier of 2 or above in a world that has a running season."),
+                "The next league cannot be provisioned.",
+                "The world needs a running season and a league above the one to create."),
 
             _ => ProblemResults.Code(
                 StatusCodes.Status404NotFound,
@@ -546,18 +549,19 @@ internal sealed record FanReviewTriggerResponse(DateOnly WeekOf, string ReviewKe
 
 /// <summary>The body of the provisioning trigger.</summary>
 /// <param name="CountryId">The country whose pyramid grows.</param>
-/// <param name="TargetTier">The tier to create, at least 2.</param>
-internal sealed record ProvisionDivisionRequest(Guid CountryId, int TargetTier);
+internal sealed record ProvisionDivisionRequest(Guid CountryId);
 
 /// <summary>Response of the provisioning trigger.</summary>
 /// <param name="CountryId">The country that was triggered.</param>
-/// <param name="TargetTier">The tier that was requested.</param>
+/// <param name="TargetTier">The tier of the league that was requested.</param>
+/// <param name="TargetLeague">The league's number within its tier.</param>
 /// <param name="RequestId">The provisioning request, once it exists.</param>
 /// <param name="BusinessKey">The business key of the enqueued job.</param>
 /// <param name="Enqueued"><see langword="true"/> when the provisioning row was newly inserted.</param>
 internal sealed record ProvisioningTriggerResponse(
     Guid CountryId,
     int TargetTier,
+    int TargetLeague,
     Guid? RequestId,
     string BusinessKey,
     bool Enqueued);

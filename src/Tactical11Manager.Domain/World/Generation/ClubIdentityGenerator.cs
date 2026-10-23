@@ -13,8 +13,9 @@ namespace Tactical11Manager.Domain.World.Generation;
 /// same seed reproduces the same pyramid and a test can assert it without either.
 /// </para>
 /// <para>
-/// Ordinals are per country and never restart per tier. Tier 1 of a country takes ordinals 0–17, tier 2
-/// takes 18–35, and so on. That is what keeps a provisioned tier from colliding with the tier above it:
+/// Ordinals are per country and never restart per league. The top division of a country takes ordinals 0–15,
+/// division 2.1 takes 16–31, division 2.2 takes 32–47, and so on down the pyramid (`PyramidShape.LeagueOrdinal`).
+/// That is what keeps a provisioned tier from colliding with the tier above it:
 /// if each tier restarted at zero, every generated tier would propose the same 18 names and the unique
 /// name index would reject the second one (`PYR-11`).
 /// </para>
@@ -56,14 +57,16 @@ public static class ClubIdentityGenerator
     /// <param name="namePoolKey">The country's name-pool key.</param>
     /// <param name="countryCode">The country's stable code, mixed into each badge seed.</param>
     /// <param name="tierNumber">The tier being generated, starting at 1.</param>
-    /// <param name="clubCount">How many clubs the tier holds.</param>
+    /// <param name="clubCount">How many clubs the league holds.</param>
+    /// <param name="leagueNumber">The league's number within its tier, starting at 1.</param>
     /// <returns>The identities, in ordinal order.</returns>
     public static IReadOnlyList<ClubIdentity> GenerateDivision(
         string seed,
         string namePoolKey,
         string countryCode,
         int tierNumber,
-        int clubCount)
+        int clubCount,
+        int leagueNumber = 1)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(seed);
         ArgumentException.ThrowIfNullOrWhiteSpace(countryCode);
@@ -71,7 +74,7 @@ public static class ClubIdentityGenerator
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(clubCount);
 
         var pool = ClubNamePools.For(namePoolKey);
-        var firstOrdinal = (tierNumber - 1) * clubCount;
+        var firstOrdinal = PyramidShape.LeagueOrdinal(tierNumber, leagueNumber) * clubCount;
         var identities = new List<ClubIdentity>(clubCount);
 
         for (var index = 0; index < clubCount; index++)

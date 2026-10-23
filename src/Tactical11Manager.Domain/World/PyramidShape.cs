@@ -39,6 +39,24 @@ public static class PyramidShape
         return 1 << (tier - 1);
     }
 
+    /// <summary>
+    /// The league's position among every league of its country, counted from the top division: 0 for the top division, 1 and
+    /// 2 for 2.1 and 2.2, 3 to 6 for 3.1 to 3.4 (`PYR-15`).
+    /// </summary>
+    /// <remarks>
+    /// Club identities and squads are numbered by this, times the clubs per league, so no two leagues of a country share a
+    /// club name. For the top division and 2.1 it equals the old per-tier ordinal, so their names and squads do not change.
+    /// </remarks>
+    /// <param name="tier">The league's tier.</param>
+    /// <param name="league">The league's number within its tier.</param>
+    public static int LeagueOrdinal(int tier, int league)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(league, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(league, LeaguesAllowed(tier));
+
+        return (LeaguesAllowed(tier) - 1) + (league - 1);
+    }
+
     /// <summary>The league of the tier above that a league feeds.</summary>
     /// <param name="tier">The league's tier, at least 2.</param>
     /// <param name="league">The league's number within its tier.</param>

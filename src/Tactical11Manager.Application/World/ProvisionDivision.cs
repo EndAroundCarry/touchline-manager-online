@@ -16,7 +16,7 @@ using Tactical11Manager.Domain.World.Generation;
 
 namespace Tactical11Manager.Application.World;
 
-/// <summary>What happened when a tier was provisioned.</summary>
+/// <summary>What happened when a league was provisioned.</summary>
 public enum ProvisionDivisionOutcome
 {
     /// <summary>The tier was generated, backfilled, validated, and activated (`PYR-8`).</summary>
@@ -29,8 +29,8 @@ public enum ProvisionDivisionOutcome
 /// <summary>The result of a provisioning run.</summary>
 /// <param name="Outcome">What happened.</param>
 /// <param name="CountryId">The country whose pyramid grew.</param>
-/// <param name="TargetTier">The tier that was created.</param>
-/// <param name="Clubs">How many clubs the tier holds.</param>
+/// <param name="TargetTier">The tier of the league that was created.</param>
+/// <param name="Clubs">How many clubs the league holds.</param>
 /// <param name="Players">How many players were created.</param>
 /// <param name="Accounts">How many club accounts were opened.</param>
 /// <param name="BackfilledRounds">How many already-passed matchdays were simulated as bootstrap (`PYR-6`).</param>
@@ -41,15 +41,16 @@ public sealed record ProvisionDivisionResult(
     int Clubs,
     int Players,
     int Accounts,
-    int BackfilledRounds);
+    int BackfilledRounds,
+    int TargetLeague = 1);
 
 /// <summary>
-/// Generates a country's next tier, backfills the matchdays already passed this season, validates the
-/// result, and activates the tier so its clubs become claimable (`PYR-4`…`PYR-8`).
+/// Generates a country's next league, backfills the matchdays already passed this season, validates the
+/// result, and activates the league so its clubs become claimable (`PYR-4`…`PYR-8`).
 /// </summary>
 /// <remarks>
 /// <para>
-/// The request is created by a takeover inside the country lock (`PYR-2`); this worker turns it into a tier.
+/// The request is created by a takeover inside the country lock (`PYR-2`); this worker turns it into a league.
 /// It is deliberately not one transaction. Generation commits first so a crash mid-backfill leaves a real,
 /// inspectable tier and a resumable request rather than nothing; the backfill then runs the ordinary
 /// lock → resolve → publish workflow once per passed round, in round order, so condition, fatigue, morale,
@@ -59,7 +60,7 @@ public sealed record ProvisionDivisionResult(
 /// <para>
 /// It is idempotent on the request's identity: a retried run finds the tier the first attempt generated and
 /// resumes at the next phase rather than generating a second. The country advisory lock and the unique
-/// constraint on <c>(country, tier)</c> are the structural backstops (`PYR-3`).
+/// constraint on <c>(country, tier, league)</c> are the structural backstops (`PYR-3`).
 /// </para>
 /// </remarks>
 public sealed partial class ProvisionDivision
@@ -169,7 +170,8 @@ public sealed partial class ProvisionDivision
                     0,
                     0,
                     0,
-                    0);
+                    0,
+                    targetLeague);
             }
 
             if (request.Status == ProvisioningRequestStatus.Requested)
@@ -250,7 +252,7 @@ public sealed partial class ProvisionDivision
                 request.Id,
                 _requestContext.CorrelationId,
                 IpHash: null,
-                Reason: $"{country.Code} tier {targetTier}"));
+                Reason: $"{country.Code} league {targetTier}.{targetLeague}"));
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -307,22 +309,22 @@ public sealed partial class ProvisionDivision
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
 
-                LogFailed(countryId, targetTier, diagnostics);
+                LogFailed(countryId, targetTier, targetLeague, diagnostics);
 
                 // Deterministic generation should reproduce, so a validation failure is a defect rather than
                 // a transient fault: dead-letter it and alert operations instead of burning the retry budget.
                 throw new PermanentJobFailureException(
-                    $"Provisioned tier {targetTier} of country {countryId} failed validation: {diagnostics} (PYR-8).");
+                    $"Provisioned league {targetTier}.{targetLeague} of country {countryId} failed validation: {diagnostics} (PYR-8).");
             }
 
             var division = await _world.FindDivisionByLeagueAsync(countryId, targetTier, targetLeague, cancellationToken)
                 ?? throw new PermanentJobFailureException(
-                    $"The provisioned tier {targetTier} of country {countryId} vanished before activation (PYR-8).");
+                    $"The provisioned league {targetTier}.{targetLeague} of country {countryId} vanished before activation (PYR-8).");
 
             division.Activate(now);
             request.Complete(now);
 
-            // The activation is news for the whole world, not one club: a new tier exists (COM-1).
+            // The activation is news for the whole world, not one club: a new league exists (COM-1).
             var newsCountry = await _world.FindCountryAsync(countryId, cancellationToken);
             var newsWorld = await _world.FindWorldAsync(cancellationToken);
 
@@ -345,17 +347,17 @@ public sealed partial class ProvisionDivision
                 request.Id,
                 _requestContext.CorrelationId,
                 IpHash: null,
-                Reason: $"{targetTier}"));
+                Reason: $"{targetTier}.{targetLeague}"));
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            // PYR-11: the tier that just filled might already be full, so growth continues by the same path.
+            // PYR-11: the free clubs might already be at the trigger again, so growth continues by the same path.
             await _capacity.EnsureNextLeagueRequestedAsync(countryId, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
 
-        LogCompleted(countryId, targetTier, clubs, backfilled);
+        LogCompleted(countryId, targetTier, targetLeague, clubs, backfilled);
 
         return new ProvisionDivisionResult(
             ProvisionDivisionOutcome.Completed,
@@ -364,7 +366,8 @@ public sealed partial class ProvisionDivision
             clubs,
             players,
             accounts,
-            backfilled);
+            backfilled,
+            targetLeague);
     }
 
     /// <summary>Checks the tier against the invariants activation requires (`PYR-8`).</summary>
@@ -416,12 +419,12 @@ public sealed partial class ProvisionDivision
     [LoggerMessage(
         EventId = 5101,
         Level = LogLevel.Information,
-        Message = "Provisioned tier {TargetTier} of country {CountryId}: {Clubs} clubs, {Rounds} rounds backfilled (PYR-4).")]
-    private partial void LogCompleted(Guid countryId, int targetTier, int clubs, int rounds);
+        Message = "Provisioned league {TargetTier}.{TargetLeague} of country {CountryId}: {Clubs} clubs, {Rounds} rounds backfilled (PYR-4).")]
+    private partial void LogCompleted(Guid countryId, int targetTier, int targetLeague, int clubs, int rounds);
 
     [LoggerMessage(
         EventId = 5102,
         Level = LogLevel.Error,
-        Message = "Provisioning tier {TargetTier} of country {CountryId} failed validation: {Diagnostics} (PYR-8).")]
-    private partial void LogFailed(Guid countryId, int targetTier, string diagnostics);
+        Message = "Provisioning league {TargetTier}.{TargetLeague} of country {CountryId} failed validation: {Diagnostics} (PYR-8).")]
+    private partial void LogFailed(Guid countryId, int targetTier, int targetLeague, string diagnostics);
 }

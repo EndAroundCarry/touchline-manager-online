@@ -17,7 +17,7 @@ public enum TriggerProvisioningOutcome
     /// <summary>The country does not exist.</summary>
     CountryNotFound = 1,
 
-    /// <summary>The target tier is not one that can be provisioned (tier 1 is seeded; tiers start at 2).</summary>
+    /// <summary>The country has no league to hang the next one from.</summary>
     InvalidTier = 2,
 
     /// <summary>No season exists to attach the new tier to.</summary>
@@ -26,8 +26,9 @@ public enum TriggerProvisioningOutcome
 
 /// <summary>The result of a diagnostics provisioning trigger.</summary>
 /// <param name="Outcome">What happened.</param>
-/// <param name="CountryId">The country whose tier was requested.</param>
-/// <param name="TargetTier">The tier requested.</param>
+/// <param name="CountryId">The country whose league was requested.</param>
+/// <param name="TargetTier">The tier of the league requested.</param>
+/// <param name="TargetLeague">The league number within its tier.</param>
 /// <param name="RequestId">The provisioning request, when one was found or created.</param>
 /// <param name="BusinessKey">The business key of the enqueued job.</param>
 /// <param name="Enqueued">Whether the job row was newly inserted.</param>
@@ -35,19 +36,21 @@ public sealed record TriggerProvisioningResult(
     TriggerProvisioningOutcome Outcome,
     Guid CountryId,
     int TargetTier,
+    int TargetLeague,
     Guid? RequestId,
     string BusinessKey,
     bool Enqueued);
 
 /// <summary>
-/// Creates a tier's provisioning request and enqueues its job, due now, so a non-production environment can
-/// grow the pyramid without waiting for a takeover to fill a tier (`PYR-2`, `PYR-4`).
+/// Creates the next league's provisioning request and enqueues its job, due now, so a non-production environment can
+/// grow the pyramid without waiting for the free clubs to fall to the trigger (`PYR-2`, `PYR-4`).
 /// </summary>
 /// <remarks>
 /// It does what a takeover's capacity evaluation does and then what the worker-only scheduler does, and nothing
-/// more: the worker still generates, backfills, validates, and activates the tier exactly as it would on the
-/// calendar. The seed is derived the same way <see cref="CapacityEvaluator"/> derives it, so a triggered tier
-/// is reproducible identically to a natural one (`PYR-14`). It has no production surface — the endpoint that
+/// more: the worker still generates, backfills, validates, and activates the league exactly as it would on the
+/// calendar. The league is the one <see cref="PyramidShape.NextLeague"/> names, and the seed is derived the same way
+/// <see cref="CapacityEvaluator"/> derives it, so a triggered league is reproducible identically to a natural one
+/// (`PYR-14`). It has no production surface — the endpoint that
 /// reaches it is mapped only when the diagnostics flag is on.
 /// </remarks>
 public sealed class TriggerProvisioning
@@ -73,32 +76,33 @@ public sealed class TriggerProvisioning
         _clock = clock;
     }
 
-    /// <summary>Requests a tier and enqueues its provisioning job.</summary>
+    /// <summary>Requests the next league of the pyramid and enqueues its provisioning job.</summary>
     /// <param name="countryId">The country whose pyramid grows.</param>
-    /// <param name="targetTier">The tier to create, at least 2.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<TriggerProvisioningResult> ExecuteAsync(
         Guid countryId,
-        int targetTier,
         CancellationToken cancellationToken)
     {
-        if (targetTier < 2)
-        {
-            return new TriggerProvisioningResult(
-                TriggerProvisioningOutcome.InvalidTier, countryId, targetTier, null, string.Empty, false);
-        }
-
         var country = await _world.FindCountryAsync(countryId, cancellationToken);
         var world = await _world.FindWorldAsync(cancellationToken);
 
         if (country is null || world is null)
         {
             return new TriggerProvisioningResult(
-                TriggerProvisioningOutcome.CountryNotFound, countryId, targetTier, null, string.Empty, false);
+                TriggerProvisioningOutcome.CountryNotFound, countryId, 0, 0, null, string.Empty, false);
         }
 
-        // Until the trigger targets the next league (milestone 3) it still asks for league 1 of a tier.
-        const int targetLeague = 1;
+        var divisions = await _world.ListDivisionsAsync(countryId, cancellationToken);
+        var target = PyramidShape.NextLeague([.. divisions.Select(division => (division.TierNumber, division.LeagueNumber))]);
+        var targetTier = target.Tier;
+        var targetLeague = target.League;
+
+        if (target.ParentLeague is not { } parentLeague)
+        {
+            return new TriggerProvisioningResult(
+                TriggerProvisioningOutcome.InvalidTier, countryId, targetTier, targetLeague, null, string.Empty, false);
+        }
+
         var request = await _requests.FindAsync(countryId, targetTier, targetLeague, cancellationToken);
 
         if (request is null)
@@ -108,19 +112,16 @@ public sealed class TriggerProvisioning
             if (season is null)
             {
                 return new TriggerProvisioningResult(
-                    TriggerProvisioningOutcome.NoSeason, countryId, targetTier, null, string.Empty, false);
+                    TriggerProvisioningOutcome.NoSeason, countryId, targetTier, targetLeague, null, string.Empty, false);
             }
 
-            var parent = await _world.FindDivisionByLeagueAsync(
-                countryId,
-                targetTier - 1,
-                PyramidShape.ParentLeagueOf(targetTier, targetLeague),
-                cancellationToken);
+            var parent = divisions.FirstOrDefault(
+                division => division.TierNumber == targetTier - 1 && division.LeagueNumber == parentLeague);
 
             if (parent is null)
             {
                 return new TriggerProvisioningResult(
-                    TriggerProvisioningOutcome.InvalidTier, countryId, targetTier, null, string.Empty, false);
+                    TriggerProvisioningOutcome.InvalidTier, countryId, targetTier, targetLeague, null, string.Empty, false);
             }
 
             request = DivisionProvisioningRequest.Request(
@@ -130,7 +131,7 @@ public sealed class TriggerProvisioning
                 targetLeague,
                 parent.Id,
                 season.Id,
-                CapacityEvaluator.GenerationSeedFor(world.Id, country.Code, targetTier),
+                CapacityEvaluator.GenerationSeedFor(world.Id, country.Code, targetTier, targetLeague),
                 _clock.UtcNow);
 
             _requests.Add(request);
@@ -154,6 +155,7 @@ public sealed class TriggerProvisioning
             TriggerProvisioningOutcome.Enqueued,
             countryId,
             targetTier,
+            targetLeague,
             request.Id,
             key,
             enqueued);

@@ -45,12 +45,12 @@ public sealed partial class ProvisionDivisionJobHandler : IJobHandler
 
         var result = await _provision.ExecuteAsync(requestId, cancellationToken);
 
-        LogProvisioned(result.CountryId, result.TargetTier, result.Clubs, result.BackfilledRounds);
+        LogProvisioned(result.CountryId, result.TargetTier, result.TargetLeague, result.Clubs, result.BackfilledRounds);
     }
 
     [LoggerMessage(
         EventId = 5100,
         Level = LogLevel.Information,
-        Message = "Provisioned tier {TargetTier} of country {CountryId}: {Clubs} clubs, {Rounds} rounds backfilled (PYR-4).")]
-    private partial void LogProvisioned(Guid countryId, int targetTier, int clubs, int rounds);
+        Message = "Provisioned league {TargetTier}.{TargetLeague} of country {CountryId}: {Clubs} clubs, {Rounds} rounds backfilled (PYR-4).")]
+    private partial void LogProvisioned(Guid countryId, int targetTier, int targetLeague, int clubs, int rounds);
 }

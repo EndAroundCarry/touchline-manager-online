@@ -37,26 +37,33 @@ public sealed class DivisionScheduleGenerator
     public DivisionScheduleGenerator(ICompetitionRepository competition) => _competition = competition;
 
     /// <summary>
-    /// Derives a season's schedule and tie-draw seeds for one tier.
+    /// Derives a season's schedule and tie-draw seeds for one league.
     /// </summary>
     /// <remarks>
     /// The season number is folded into every seed, so a division's fixture list is different each season
     /// while still being reproducible from the same inputs. The inputs are the world's generation seed, the
-    /// country code, the season number, and the tier, so the same seed and season reproduce the same list.
+    /// country code, the season number, the tier, and the league's number within it, so the same seed and season
+    /// reproduce the same list. The league number is left out of the first league of a tier, so the seeds of the top
+    /// division and of division 2.1 are what they were before a tier could hold several leagues, and division 2.2
+    /// does not share 2.1's.
     /// </remarks>
     /// <param name="seed">The world's generation seed (`PYR-14`).</param>
     /// <param name="countryCode">The country's stable code.</param>
     /// <param name="seasonNumber">The season the schedule is for.</param>
     /// <param name="tier">The tier.</param>
-    public static SeasonScheduleSeeds SeedsFor(string seed, string countryCode, int seasonNumber, int tier)
+    /// <param name="league">The league's number within its tier.</param>
+    public static SeasonScheduleSeeds SeedsFor(string seed, string countryCode, int seasonNumber, int tier, int league = 1)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(seed);
         ArgumentException.ThrowIfNullOrWhiteSpace(countryCode);
         ArgumentOutOfRangeException.ThrowIfLessThan(seasonNumber, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(tier, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(league, 1);
 
         var season = seasonNumber.ToString(CultureInfo.InvariantCulture);
-        var tierText = tier.ToString(CultureInfo.InvariantCulture);
+        var tierText = league == 1
+            ? tier.ToString(CultureInfo.InvariantCulture)
+            : string.Create(CultureInfo.InvariantCulture, $"{tier}.{league}");
 
         var scheduleSeed = DeterministicDigest.Of(seed, countryCode, season, tierText, "schedule");
         var tieDrawSeed = DeterministicDigest.Of(seed, countryCode, season, tierText, "tie-draw");

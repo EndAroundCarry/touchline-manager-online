@@ -293,7 +293,7 @@ public sealed class ClaimClub
 
         if (capacity.ClubsInCountry > 0 && capacity.HumanOccupiedClubs >= capacity.ClubsInCountry)
         {
-            // PYR-2: the country is full, so the answer is a new tier rather than a refusal with no
+            // PYR-2: the country is full, so the answer is a new league rather than a refusal with no
             // way forward. PYR-10 requires the request's state to come back with the response.
             var provisioning = await _capacity.EnsureNextLeagueRequestedAsync(club.CountryId, cancellationToken);
 
@@ -353,7 +353,7 @@ public sealed class ClaimClub
 
         // The welcome is the first thing a new manager reads, written in the takeover's own transaction so an
         // inbox with a club always has it (COM-1).
-        var welcome = InboxTemplates.Welcome(club.Name, capacity.DivisionName);
+        var welcome = InboxTemplates.Welcome(club.Name, placement.Division.DisplayName);
 
         _inbox.Add(InboxMessage.Record(
             Guid.CreateVersion7(),
@@ -368,8 +368,8 @@ public sealed class ClaimClub
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // PYR-1: this takeover may be the one that filled the tier, and the row that filled it is only
-        // visible to the evaluation once it has been saved inside the transaction.
+        // PYR-1: this takeover may be the one that took the free clubs down to the trigger, and the row that did is
+        // only visible to the evaluation once it has been saved inside the transaction.
         await _capacity.EnsureNextLeagueRequestedAsync(club.CountryId, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

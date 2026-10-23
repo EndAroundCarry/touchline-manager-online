@@ -115,21 +115,25 @@ public sealed class ClubIdentityGeneratorTests
     }
 
     [Fact]
-    public void A_very_deep_pyramid_is_still_named_uniquely_without_a_ceiling()
+    public void A_deep_doubling_pyramid_is_still_named_uniquely()
     {
-        // PYR-11 says there is no maximum tier. Past the pool's combination cycle the generator falls
-        // back to qualifiers and numerals rather than repeating a name or throwing.
+        // PYR-11 and PYR-15: a tier holds twice the leagues of the one above, so eight tiers are 255 leagues, well past the
+        // pool's combination cycle. The generator falls back to qualifiers and numerals rather than repeating a name or
+        // throwing.
         var names = new List<string>();
 
-        for (var tier = 1; tier <= 40; tier++)
+        for (var tier = 1; tier <= 8; tier++)
         {
-            names.AddRange(
-                ClubIdentityGenerator
-                    .GenerateDivision(Seed, "england", "ENG", tier, clubCount: 18)
-                    .Select(identity => identity.Name));
+            for (var league = 1; league <= PyramidShape.LeaguesAllowed(tier); league++)
+            {
+                names.AddRange(
+                    ClubIdentityGenerator
+                        .GenerateDivision(Seed, "england", "ENG", tier, clubCount: 16, leagueNumber: league)
+                        .Select(identity => identity.Name));
+            }
         }
 
-        names.Should().HaveCount(720).And.OnlyHaveUniqueItems();
+        names.Should().HaveCount(255 * 16).And.OnlyHaveUniqueItems();
     }
 
     [Fact]
@@ -257,6 +261,32 @@ public sealed class ClubIdentityGeneratorTests
         var act = () => ClubIdentityGenerator.Generate(Seed, pool, "ENG", -1);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void The_first_league_of_a_tier_is_named_as_before_and_every_other_league_continues_the_cycle()
+    {
+        // PYR-15: the top division and division 2.1 keep their names; 2.2 continues after them, and the leagues of tier 3
+        // follow, so a country never repeats a name however its pyramid grows.
+        var leagues = new[] { (1, 1), (2, 1), (2, 2), (3, 1), (3, 2), (3, 3), (3, 4), (4, 1) };
+
+        var names = leagues
+            .SelectMany(league => ClubIdentityGenerator.GenerateDivision(
+                Seed, "england", "ENG", league.Item1, clubCount: 16, leagueNumber: league.Item2))
+            .Select(identity => Club.NormalizeName(identity.Name))
+            .ToList();
+
+        names.Should().HaveCount(leagues.Length * 16);
+        names.Should().OnlyHaveUniqueItems();
+
+        ClubIdentityGenerator.GenerateDivision(Seed, "england", "ENG", 2, clubCount: 16)
+            .Select(identity => identity.Name)
+            .Should().Equal(ClubIdentityGenerator.GenerateDivision(Seed, "england", "ENG", 2, clubCount: 16, leagueNumber: 1)
+                .Select(identity => identity.Name));
+        ClubIdentityGenerator.GenerateDivision(Seed, "england", "ENG", 2, clubCount: 16, leagueNumber: 2)
+            .Select(identity => identity.Name)
+            .Should().Equal(Enumerable.Range(32, 16)
+                .Select(ordinal => ClubIdentityGenerator.Generate(Seed, ClubNamePools.For("england"), "ENG", ordinal).Name));
     }
 
     [Fact]
