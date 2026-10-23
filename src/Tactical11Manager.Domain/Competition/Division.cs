@@ -1,10 +1,11 @@
 using System.Globalization;
 using Tactical11Manager.Domain.Rules;
+using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Domain.Competition;
 
 /// <summary>
-/// One tier of one country's pyramid, e.g. "Spain Division 2".
+/// One league of one country's pyramid, e.g. "Spain Division 2.1": the first league of tier 2.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -32,6 +33,12 @@ public sealed class Division
 
     /// <summary>Gets the tier number. Tier 1 is the top of the pyramid (`WORLD-4`).</summary>
     public int TierNumber { get; private set; }
+
+    /// <summary>Gets the league's number within its tier, starting at 1 (the "1" of "Division 2.1").</summary>
+    public int LeagueNumber { get; private set; } = 1;
+
+    /// <summary>Gets the division of the tier above that this league feeds, or <see langword="null"/> for the top division.</summary>
+    public Guid? ParentDivisionId { get; private set; }
 
     /// <summary>Gets the generated display name.</summary>
     public string DisplayName { get; private set; } = string.Empty;
@@ -61,13 +68,17 @@ public sealed class Division
     /// <param name="id">A server-generated identity.</param>
     /// <param name="countryId">The owning country.</param>
     /// <param name="tierNumber">The tier number, starting at 1.</param>
-    /// <param name="countryDisplayName">The country's display name, used to build the tier name.</param>
+    /// <param name="leagueNumber">The league's number within its tier, starting at 1.</param>
+    /// <param name="parentDivisionId">The division of the tier above that this league feeds; <see langword="null"/> for the top division.</param>
+    /// <param name="countryDisplayName">The country's display name, used to build the league name.</param>
     /// <param name="createdSeasonId">The season the division is created in.</param>
     /// <param name="now">The current instant.</param>
     public static Division Provision(
         Guid id,
         Guid countryId,
         int tierNumber,
+        int leagueNumber,
+        Guid? parentDivisionId,
         string countryDisplayName,
         Guid createdSeasonId,
         DateTimeOffset now)
@@ -79,12 +90,27 @@ public sealed class Division
             throw new ArgumentOutOfRangeException(nameof(tierNumber), tierNumber, "A tier starts at 1 (WORLD-4).");
         }
 
+        if (leagueNumber < 1 || leagueNumber > PyramidShape.LeaguesAllowed(tierNumber))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(leagueNumber),
+                leagueNumber,
+                "A tier holds 2^(tier-1) leagues, numbered from 1 (PYR-15).");
+        }
+
+        if (tierNumber == 1 && parentDivisionId is not null)
+        {
+            throw new ArgumentException("The top division feeds no other league (PYR-15).", nameof(parentDivisionId));
+        }
+
         return new Division
         {
             Id = id,
             CountryId = countryId,
             TierNumber = tierNumber,
-            DisplayName = NameFor(countryDisplayName, tierNumber),
+            LeagueNumber = leagueNumber,
+            ParentDivisionId = parentDivisionId,
+            DisplayName = NameFor(countryDisplayName, tierNumber, leagueNumber),
             Status = DivisionStatus.Provisioning,
             CreatedSeasonId = createdSeasonId,
             Capacity = WorldRuleSet.ClubsPerDivision,
@@ -95,21 +121,23 @@ public sealed class Division
     }
 
     /// <summary>
-    /// Builds a generic, unbranded tier name for a country.
+    /// Builds a generic, unbranded league name for a country.
     /// </summary>
     /// <remarks>
-    /// "Top Division" and "Division N" are deliberately descriptive rather than evocative of any real
-    /// competition, so no protected league branding can leak in through a generated name (`WORLD-3`).
+    /// "Top Division" and "Division N.L" are deliberately descriptive rather than evocative of any real
+    /// competition, so no protected league branding can leak in through a generated name (`WORLD-3`). Every
+    /// league below the top carries its number within the tier, even while it is alone in it ("Division 2.1").
     /// </remarks>
     /// <param name="countryDisplayName">The country's display name.</param>
     /// <param name="tierNumber">The tier number.</param>
-    public static string NameFor(string countryDisplayName, int tierNumber)
+    /// <param name="leagueNumber">The league's number within its tier.</param>
+    public static string NameFor(string countryDisplayName, int tierNumber, int leagueNumber)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(countryDisplayName);
 
         return tierNumber == 1
             ? string.Create(CultureInfo.InvariantCulture, $"{countryDisplayName.Trim()} Top Division")
-            : string.Create(CultureInfo.InvariantCulture, $"{countryDisplayName.Trim()} Division {tierNumber}");
+            : string.Create(CultureInfo.InvariantCulture, $"{countryDisplayName.Trim()} Division {tierNumber}.{leagueNumber}");
     }
 
     /// <summary>Marks the division complete so its clubs become claimable (`PYR-8`).</summary>

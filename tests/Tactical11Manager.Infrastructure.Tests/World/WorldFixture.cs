@@ -297,6 +297,8 @@ public abstract class WorldTestBase
             Guid.CreateVersion7(),
             countryId,
             tierNumber,
+            leagueNumber: 1,
+            parentDivisionId: null,
             country.DisplayName,
             season.Id,
             now);

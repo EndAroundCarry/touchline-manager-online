@@ -30,11 +30,41 @@ public sealed class DivisionProvisioningRequestTests
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             1,
+            1,
+            Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             "seed",
             Now);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void A_request_remembers_its_league_and_the_league_it_feeds()
+    {
+        var parentId = Guid.CreateVersion7();
+
+        var request = DivisionProvisioningRequest.Request(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), 3, 4, parentId, Guid.CreateVersion7(), "seed", Now);
+
+        request.TargetTier.Should().Be(3);
+        request.TargetLeagueNumber.Should().Be(4);
+        request.ParentDivisionId.Should().Be(parentId);
+    }
+
+    [Fact]
+    public void A_league_beyond_the_tiers_allowance_or_without_a_parent_is_a_programming_error()
+    {
+        var tooMany = () => DivisionProvisioningRequest.Request(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), 2, 3, Guid.CreateVersion7(), Guid.CreateVersion7(), "seed", Now);
+        var leagueZero = () => DivisionProvisioningRequest.Request(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), 2, 0, Guid.CreateVersion7(), Guid.CreateVersion7(), "seed", Now);
+        var noParent = () => DivisionProvisioningRequest.Request(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), 2, 1, Guid.Empty, Guid.CreateVersion7(), "seed", Now);
+
+        tooMany.Should().Throw<ArgumentOutOfRangeException>("tier 2 holds two leagues");
+        leagueZero.Should().Throw<ArgumentOutOfRangeException>();
+        noParent.Should().Throw<ArgumentException>();
     }
 
     [Fact]
@@ -65,7 +95,7 @@ public sealed class DivisionProvisioningRequestTests
     [Fact]
     public void Retrying_a_failed_request_reuses_the_row_and_its_seed()
     {
-        // unique (country_id, target_tier) means a second request for the same tier cannot exist, so a
+        // unique (country_id, target_tier, target_league_number) means a second request for the same league cannot exist, so a
         // retry must reuse this one — and must attempt the same world, not a different one (PYR-14).
         var request = Request();
         var seed = request.GenerationSeed;
@@ -146,6 +176,8 @@ public sealed class DivisionProvisioningRequestTests
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             targetTier: 2,
+            targetLeagueNumber: 1,
+            Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             "world-seed-1",
             Now);

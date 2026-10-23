@@ -224,11 +224,11 @@ public sealed class WorldPersistenceTests
         var seasonId = await db.Seasons.Select(season => season.Id).FirstAsync();
 
         db.DivisionProvisioningRequests.Add(
-            DivisionProvisioningRequest.Request(Guid.CreateVersion7(), countryId, 2, seasonId, "seed-a", now));
+            DivisionProvisioningRequest.Request(Guid.CreateVersion7(), countryId, 2, 1, Guid.CreateVersion7(), seasonId, "seed-a", now));
         await db.SaveChangesAsync();
 
         db.DivisionProvisioningRequests.Add(
-            DivisionProvisioningRequest.Request(Guid.CreateVersion7(), countryId, 2, seasonId, "seed-b", now));
+            DivisionProvisioningRequest.Request(Guid.CreateVersion7(), countryId, 2, 1, Guid.CreateVersion7(), seasonId, "seed-b", now));
 
         var act = async () => await db.SaveChangesAsync();
         var exception = await act.Should().ThrowAsync<DbUpdateException>();
@@ -300,6 +300,8 @@ public sealed class WorldPersistenceTests
             Guid.CreateVersion7(),
             countryId,
             4,
+            1,
+            null,
             "England",
             seasonId,
             _fixture.Clock.UtcNow));
@@ -309,6 +311,8 @@ public sealed class WorldPersistenceTests
             Guid.CreateVersion7(),
             countryId,
             4,
+            1,
+            null,
             "England",
             seasonId,
             _fixture.Clock.UtcNow));
@@ -359,7 +363,7 @@ public sealed class WorldPersistenceTests
 
         var firstDivisionSeasonId = await db.DivisionSeasons.Select(entry => entry.Id).FirstAsync();
 
-        var secondDivision = Division.Provision(Guid.CreateVersion7(), countryId, 5, "England", seasonId, now);
+        var secondDivision = Division.Provision(Guid.CreateVersion7(), countryId, 5, 1, null, "England", seasonId, now);
         db.Divisions.Add(secondDivision);
         await db.SaveChangesAsync();
 
@@ -715,7 +719,7 @@ public sealed class WorldPersistenceTests
         await db.SaveChangesAsync();
 
         var divisionId = Guid.CreateVersion7();
-        db.Divisions.Add(Division.Provision(divisionId, countryId, 1, "England", seasonId, now));
+        db.Divisions.Add(Division.Provision(divisionId, countryId, 1, 1, null, "England", seasonId, now));
         await db.SaveChangesAsync();
 
         var divisionSeasonId = Guid.CreateVersion7();

@@ -85,6 +85,9 @@ internal sealed class DivisionConfiguration : IEntityTypeConfiguration<Division>
         builder.Property(division => division.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(division => division.CountryId).HasColumnName("country_id").IsRequired();
         builder.Property(division => division.TierNumber).HasColumnName("tier_number").IsRequired();
+        // The league number and parent get their columns with the schema milestone; until then every tier has one league.
+        builder.Ignore(division => division.LeagueNumber);
+        builder.Ignore(division => division.ParentDivisionId);
         builder.Property(division => division.DisplayName)
             .HasColumnName("display_name")
             .HasMaxLength(80)

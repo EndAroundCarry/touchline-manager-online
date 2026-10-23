@@ -35,12 +35,16 @@ public sealed record TemplateSlot(PlayerPosition Position, int Rating, int Age, 
 /// <para>
 /// A rating is the displayed ability, the rounded mean of a player's 28 attributes. Tier 1 is rated 8 to 12 (three
 /// 12s, four 11s, five 10s, six 9s and six 8s) and tier 2 is rated 8 to 10 (three 10s, nine 9s and twelve 8s). The
-/// best players sit across the spine of the team, so every first eleven is comparable. A deeper tier is tier 2's mix
-/// shifted down one rating per tier, never below <see cref="RatingFloor"/>.
+/// best players sit across the spine of the team, so every first eleven is comparable. Tier 3 is tier 2's mix shifted
+/// down one rating (7 to 9) and tier 4 shifted down two (three 8s, nine 7s and twelve 6s). Each tier below that has one
+/// 8 fewer than the one above, the best slot in composition order dropping to 7; once no 8s are left, one 7 a tier
+/// drops to 6, until every slot is <see cref="RatingFloor"/> (`PYR-15`).
 /// </para>
 /// <para>
 /// A little diversity is seeded per club: a coin decides whether the left and right sides are mirrored, and
-/// <see cref="NudgeCount"/> slots move one rating, half of them up and half down, always inside the tier's band. Each club also gets
+/// <see cref="NudgeCount"/> slots move one rating, half of them up and half down, always inside the tier's band. In tier 4
+/// and below the nudges only trade a 6 for a 7, so a club never makes or loses an 8 and keeps exactly its tier's count.
+/// Each club also gets
 /// exactly <see cref="GemsPerSquad"/> gem and <see cref="TalentsPerSquad"/> talents, picked among its youngest players.
 /// Everything is a pure function of the seed, the country, the club's ordinal and the tier.
 /// </para>
@@ -48,7 +52,7 @@ public sealed record TemplateSlot(PlayerPosition Position, int Rating, int Age, 
 public static class SquadTemplate
 {
     /// <summary>The template version, recorded with the generator version when a world is seeded (`PYR-14`).</summary>
-    public const string Version = "squad-template-v1";
+    public const string Version = "squad-template-v2";
 
     /// <summary>How many slots of a club move one rating up or down.</summary>
     public const int NudgeCount = 4;
@@ -60,7 +64,13 @@ public static class SquadTemplate
     public const int GemsPerSquad = 1;
 
     /// <summary>The lowest rating a template gives anywhere.</summary>
-    public const int RatingFloor = 5;
+    public const int RatingFloor = 6;
+
+    /// <summary>The first tier whose mix is built by dropping 8s and then 7s one a tier, rather than shifted whole.</summary>
+    private const int FirstThinningTier = 4;
+
+    /// <summary>The highest rating a nudge may give in the thinning tiers, so none of them gains an 8.</summary>
+    private const int ThinningNudgeCeiling = 7;
 
     /// <summary>The oldest age a player can be and still be picked as a talent or a gem when enough younger players exist.</summary>
     public const int YoungestPickAge = 23;
@@ -126,10 +136,14 @@ public static class SquadTemplate
             return (TierOneBandLow, TierOneBandHigh);
         }
 
-        var shift = tier - 2;
-        var low = Math.Max(RatingFloor, TierTwoBandLow - shift);
+        if (tier >= FirstThinningTier)
+        {
+            return (RatingFloor, BaseRatingsFor(tier).Max());
+        }
 
-        return (low, Math.Max(low, TierTwoBandHigh - shift));
+        var shift = tier - 2;
+
+        return (TierTwoBandLow - shift, TierTwoBandHigh - shift);
     }
 
     /// <summary>The template ratings of a tier before any club's diversity, in composition order.</summary>
@@ -143,9 +157,34 @@ public static class SquadTemplate
             return TierOne;
         }
 
-        var shift = tier - 2;
+        if (tier < FirstThinningTier)
+        {
+            return [.. TierTwo.Select(rating => rating - (tier - 2))];
+        }
 
-        return [.. TierTwo.Select(rating => Math.Max(RatingFloor, rating - shift))];
+        var ratings = TierTwo.Select(rating => rating - 2).ToArray();
+
+        // One step per tier below the fourth: the best slot still rated 8 drops to 7, and once none is left the best
+        // slot still rated 7 drops to 6. "Best" is the first in composition order, which lists each line's strongest
+        // player first, so every tier drops the same slots.
+        for (var step = FirstThinningTier; step < tier; step++)
+        {
+            var slot = Array.IndexOf(ratings, 8);
+
+            if (slot < 0)
+            {
+                slot = Array.IndexOf(ratings, 7);
+            }
+
+            if (slot < 0)
+            {
+                break;
+            }
+
+            ratings[slot]--;
+        }
+
+        return ratings;
     }
 
     /// <summary>
@@ -194,10 +233,16 @@ public static class SquadTemplate
         }
 
         // Half the nudges raise a slot and half lower another, so a club's total ability stays the template's and only its
-        // shape moves.
+        // shape moves. From tier 4 down the nudges stay between 6 and 7, so a club never makes or loses an 8 and keeps
+        // exactly its tier's count of them.
+        var ceiling = tier >= FirstThinningTier ? Math.Min(high, ThinningNudgeCeiling) : high;
         var order = Shuffled(composition.Length, rng);
-        var raised = order.Where(slot => ratings[slot] < high).Take(NudgeCount / 2).ToList();
-        var lowered = order.Where(slot => ratings[slot] > low && !raised.Contains(slot)).Take(NudgeCount / 2).ToList();
+        var raised = order.Where(slot => ratings[slot] < ceiling).Take(NudgeCount / 2).ToList();
+        var lowered = order.Where(slot => ratings[slot] > low && ratings[slot] <= ceiling && !raised.Contains(slot)).Take(NudgeCount / 2).ToList();
+        var pairs = Math.Min(raised.Count, lowered.Count);
+
+        raised = raised[..pairs];
+        lowered = lowered[..pairs];
 
         foreach (var slot in raised)
         {

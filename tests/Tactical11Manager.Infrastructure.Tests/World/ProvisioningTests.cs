@@ -288,6 +288,8 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
             Guid.CreateVersion7(),
             countryId,
             targetTier,
+            targetLeagueNumber: 1,
+            Guid.CreateVersion7(),
             seasonId,
             $"provision-test-{countryId:N}-{targetTier}",
             now);

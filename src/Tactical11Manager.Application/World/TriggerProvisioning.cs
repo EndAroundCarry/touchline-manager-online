@@ -109,10 +109,22 @@ public sealed class TriggerProvisioning
                     TriggerProvisioningOutcome.NoSeason, countryId, targetTier, null, string.Empty, false);
             }
 
+            // Until the trigger targets the next league (milestone 3) it still asks for league 1 of a tier, which
+            // feeds league 1 of the tier above.
+            var parent = await _world.FindDivisionByTierAsync(countryId, targetTier - 1, cancellationToken);
+
+            if (parent is null)
+            {
+                return new TriggerProvisioningResult(
+                    TriggerProvisioningOutcome.InvalidTier, countryId, targetTier, null, string.Empty, false);
+            }
+
             request = DivisionProvisioningRequest.Request(
                 Guid.CreateVersion7(),
                 countryId,
                 targetTier,
+                targetLeagueNumber: 1,
+                parent.Id,
                 season.Id,
                 CapacityEvaluator.GenerationSeedFor(world.Id, country.Code, targetTier),
                 _clock.UtcNow);

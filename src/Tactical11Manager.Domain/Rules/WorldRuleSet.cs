@@ -33,6 +33,8 @@ namespace Tactical11Manager.Domain.Rules;
 /// <see cref="EconomyRuleSet"/>; the entries below that were tier-divided baselines now read from it.
 /// The fair squads milestone (plan cheeky-dongarra) made every seeded club of a tier open with the same mix of abilities
 /// (<see cref="Squad.Generation.SquadTemplate"/>) and tier 2 exist from the first season.
+/// The growing pyramid milestone made a country add a league once only 30 per cent of its clubs are free, and doubled the
+/// leagues of each tier (<see cref="World.PyramidShape"/>).
 /// Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
 /// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
@@ -40,16 +42,22 @@ namespace Tactical11Manager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v19";
+    public const string Version = "world-rules-v20";
 
     /// <summary>Every active division holds exactly 16 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 16;
 
     /// <summary>
     /// A new world opens with tiers 1 and 2 in every country, so promotion and relegation work from the first
-    /// season (`WORLD-5`). Deeper tiers are provisioned when a country fills up (`PYR-2`).
+    /// season (`WORLD-5`). Further leagues are provisioned as a country fills up (`PYR-2`).
     /// </summary>
     public const int SeededTiers = 2;
+
+    /// <summary>
+    /// The pyramid grows when the free (AI-run) clubs fall to this share of the clubs in the country's active leagues,
+    /// or below it (`PYR-2`).
+    /// </summary>
+    public const int ExpansionFreeClubsPercent = 30;
 
     /// <summary>A double round-robin season is 30 matchdays (`CAL-1`).</summary>
     public const int MatchdaysPerSeason = 30;

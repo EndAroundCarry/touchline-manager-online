@@ -306,6 +306,9 @@ internal sealed class DivisionProvisioningRequestConfiguration : IEntityTypeConf
         builder.Property(request => request.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(request => request.CountryId).HasColumnName("country_id").IsRequired();
         builder.Property(request => request.TargetTier).HasColumnName("target_tier").IsRequired();
+        // The target league and parent get their columns with the schema milestone; until then every tier has one league.
+        builder.Ignore(request => request.TargetLeagueNumber);
+        builder.Ignore(request => request.ParentDivisionId);
         builder.Property(request => request.TargetSeasonId).HasColumnName("target_season_id").IsRequired();
         builder.Property(request => request.Status)
             .HasColumnName("status")

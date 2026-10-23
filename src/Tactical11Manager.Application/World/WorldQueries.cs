@@ -180,12 +180,15 @@ public sealed class GetCountryCapacity
             snapshot.LowestActiveTier,
             snapshot.DivisionId,
             snapshot.ClubsInCountry,
-            snapshot.HumanOccupiedClubs);
+            snapshot.HumanOccupiedClubs,
+            [.. Enumerable.Range(1, snapshot.LowestActiveTier).Select(tier => (tier, 1))]);
 
         // The provisioning record is only interesting while the country is full: that is the only time
-        // onboarding is actually waiting on it.
-        var provisioning = rules.NeedsExpansion
-            ? await _requests.FindAsync(snapshot.CountryId, rules.TargetTierForExpansion, cancellationToken)
+        // onboarding is actually waiting on it. Until the response reports the next league (milestone 5) that is
+        // still the tier below the lowest.
+        var targetTier = snapshot.LowestActiveTier + 1;
+        var provisioning = rules.CountryIsFull
+            ? await _requests.FindAsync(snapshot.CountryId, targetTier, cancellationToken)
             : null;
 
         return new CountryCapacityResponse(
@@ -197,7 +200,7 @@ public sealed class GetCountryCapacity
             snapshot.HumanOccupiedClubs,
             rules.AvailableClubs,
             rules.CountryIsFull,
-            rules.TargetTierForExpansion,
+            targetTier,
             provisioning?.ToProvisioningResponse(_options.ProvisioningPollSeconds),
             _clock.UtcNow);
     }

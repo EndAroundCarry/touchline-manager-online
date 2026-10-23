@@ -83,14 +83,17 @@ public sealed class CapacityEvaluator
             capacity.LowestActiveTier,
             capacity.DivisionId,
             capacity.ClubsInCountry,
-            capacity.HumanOccupiedClubs);
+            capacity.HumanOccupiedClubs,
+            [.. Enumerable.Range(1, capacity.LowestActiveTier).Select(tier => (tier, 1))]);
 
-        if (!rules.NeedsExpansion)
+        // Until growth follows the 30% rule and the pyramid shape (milestones 2 and 3) a country still grows a tier at a
+        // time, once every club has a human manager.
+        if (!rules.CountryIsFull)
         {
             return null;
         }
 
-        var targetTier = rules.TargetTierForExpansion;
+        var targetTier = capacity.LowestActiveTier + 1;
         var existing = await _requests.FindAsync(countryId, targetTier, cancellationToken);
 
         if (existing is not null)
@@ -121,6 +124,8 @@ public sealed class CapacityEvaluator
             Guid.CreateVersion7(),
             countryId,
             targetTier,
+            targetLeagueNumber: 1,
+            capacity.DivisionId,
             season.Id,
             GenerationSeedFor(world.Id, country.Code, targetTier),
             now);

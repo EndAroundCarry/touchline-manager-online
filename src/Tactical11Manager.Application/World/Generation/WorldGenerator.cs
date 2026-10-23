@@ -123,10 +123,13 @@ public sealed class WorldGenerator
         var season = request.Season;
         var seed = request.Seed;
 
+        // Every country still has one league per tier until the generator builds leagues by number (milestone 3).
         var division = Division.Provision(
             Guid.CreateVersion7(),
             country.Id,
             tier,
+            leagueNumber: 1,
+            parentDivisionId: null,
             country.DisplayName,
             season.Id,
             now);

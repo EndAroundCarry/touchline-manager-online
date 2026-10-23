@@ -39,27 +39,61 @@ public sealed class SquadTemplateTests
     [Fact]
     public void A_template_has_a_rating_for_every_slot_of_the_composition()
     {
-        foreach (var tier in new[] { 1, 2, 3, 6 })
+        foreach (var tier in new[] { 1, 2, 3, 4, 6, 9, 25 })
         {
             SquadTemplate.BaseRatingsFor(tier).Should().HaveCount(WorldRuleSet.GeneratorSquadTarget, $"tier {tier}");
         }
     }
 
     [Fact]
-    public void A_deeper_tier_is_tier_twos_mix_shifted_down_one_rating_per_tier_and_never_below_five()
+    public void Tier_three_is_tier_twos_mix_shifted_down_one_and_tier_four_shifted_down_two()
     {
         SquadTemplate.BandFor(3).Should().Be((7, 9));
         SquadTemplate.BandFor(4).Should().Be((6, 8));
         SquadTemplate.BaseRatingsFor(3).Should().Equal(SquadTemplate.BaseRatingsFor(2).Select(rating => rating - 1));
         SquadTemplate.BaseRatingsFor(4).Should().Equal(SquadTemplate.BaseRatingsFor(2).Select(rating => rating - 2));
+        Counts(SquadTemplate.BaseRatingsFor(3)).Should().Equal(new Dictionary<int, int> { [9] = 3, [8] = 9, [7] = 12 });
+        Counts(SquadTemplate.BaseRatingsFor(4)).Should().Equal(new Dictionary<int, int> { [8] = 3, [7] = 9, [6] = 12 });
+    }
 
-        foreach (var tier in Enumerable.Range(1, 12))
+    [Fact]
+    public void Each_tier_below_the_fourth_has_one_eight_fewer_than_the_tier_above_until_none_is_left()
+    {
+        var eights = Enumerable.Range(4, 4).Select(tier => SquadTemplate.BaseRatingsFor(tier).Count(rating => rating == 8)).ToList();
+
+        eights.Should().Equal(3, 2, 1, 0);
+    }
+
+    [Fact]
+    public void With_no_eights_left_each_tier_turns_one_seven_into_a_six_until_every_slot_is_a_six()
+    {
+        var sevens = Enumerable.Range(7, 13).Select(tier => SquadTemplate.BaseRatingsFor(tier).Count(rating => rating == 7)).ToList();
+
+        sevens[0].Should().Be(12, "tier 7 is twelve 7s and twelve 6s");
+        sevens.Zip(sevens.Skip(1), (above, below) => above - below).Should().OnlyContain(drop => drop == 1);
+        sevens[^1].Should().Be(0);
+        SquadTemplate.BaseRatingsFor(20).Should().OnlyContain(rating => rating == 6, "the mix stops at the floor");
+        SquadTemplate.BandFor(20).Should().Be((6, 6));
+        SquadTemplate.BandFor(7).Should().Be((6, 7));
+    }
+
+    [Fact]
+    public void A_deeper_tier_only_ever_drops_slots_the_tier_above_rated_higher_and_never_goes_below_six()
+    {
+        SquadTemplate.RatingFloor.Should().Be(6);
+
+        foreach (var tier in Enumerable.Range(4, 20))
         {
-            SquadTemplate.BaseRatingsFor(tier).Should().OnlyContain(rating => rating >= SquadTemplate.RatingFloor, $"tier {tier}");
+            var above = SquadTemplate.BaseRatingsFor(tier - 1);
+            var ratings = SquadTemplate.BaseRatingsFor(tier);
+
+            ratings.Should().OnlyContain(rating => rating >= SquadTemplate.RatingFloor, $"tier {tier}");
+            ratings.Zip(above, (rating, higher) => higher - rating).Should().OnlyContain(drop => drop == 0 || drop == 1, $"tier {tier}");
 
             var (low, high) = SquadTemplate.BandFor(tier);
 
-            SquadTemplate.BaseRatingsFor(tier).Should().OnlyContain(rating => rating >= low && rating <= high, $"tier {tier}");
+            ratings.Should().OnlyContain(rating => rating >= low && rating <= high, $"tier {tier}");
+            ratings.Max().Should().Be(high, $"tier {tier}");
         }
     }
 
@@ -102,6 +136,42 @@ public sealed class SquadTemplateTests
             ratings.Should().OnlyContain(rating => rating >= low && rating <= high, $"club {ordinal}");
             Math.Abs(ratings.Sum() - template).Should().BeLessThanOrEqualTo(SquadTemplate.NudgeCount, $"club {ordinal}");
             ratings.Sum().Should().Be(template, $"club {ordinal}: half the nudges raise a slot and half lower one");
+        }
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(12)]
+    public void Nudges_in_the_deeper_tiers_trade_a_six_for_a_seven_and_never_make_or_remove_an_eight(int tier)
+    {
+        var template = SquadTemplate.BaseRatingsFor(tier);
+        var eights = template.Count(rating => rating == 8);
+        var (low, high) = SquadTemplate.BandFor(tier);
+
+        for (var ordinal = 0; ordinal < 200; ordinal++)
+        {
+            var ratings = SquadTemplate.PlanFor(Seed, "ENG", ordinal, tier).Select(slot => slot.Rating).ToList();
+
+            ratings.Count(rating => rating == 8).Should().Be(eights, $"tier {tier} club {ordinal}");
+            ratings.Should().OnlyContain(rating => rating >= low && rating <= high, $"tier {tier} club {ordinal}");
+            ratings.Sum().Should().Be(template.Sum(), $"tier {tier} club {ordinal}: half the nudges raise a slot and half lower one");
+        }
+    }
+
+    [Fact]
+    public void A_deeper_tier_has_fewer_eights_in_every_club_than_the_tier_above()
+    {
+        for (var ordinal = 0; ordinal < 50; ordinal++)
+        {
+            var eights = Enumerable.Range(4, 4)
+                .Select(tier => SquadTemplate.PlanFor(Seed, "ENG", ordinal, tier).Count(slot => slot.Rating == 8))
+                .ToList();
+
+            eights.Should().Equal(3, 2, 1, 0);
         }
     }
 
@@ -273,13 +343,15 @@ public sealed class SquadTemplateTests
 
         GoldenDigest(squad).Should().Be(
             "46f9a3f906c6e96c",
-            "player-gen-v4 and squad-template-v1 fix every slot's rating (plan cheeky-dongarra); every name pool is 36 by 37 from player-name-pools-v2 (the digest before was 89116c61d922b1b8)");
+            "player-gen-v4 and squad-template-v2 fix every slot's rating (plan cheeky-dongarra); every name pool is 36 by 37 from player-name-pools-v2 (the digest before was 89116c61d922b1b8)");
     }
 
     [Theory]
     [InlineData(1, 8, 9)]
     [InlineData(2, 8, 8)]
     [InlineData(3, 7, 7)]
+    [InlineData(4, 6, 6)]
+    [InlineData(9, 6, 6)]
     public void An_emergency_replacement_is_one_of_the_tiers_lowest_ratings(int tier, int lowest, int highest)
     {
         var seen = new HashSet<int>();
@@ -313,7 +385,8 @@ public sealed class SquadTemplateTests
     {
         SquadTemplate.Version.Should().NotBeNullOrWhiteSpace();
         PlayerGenerator.Version.Should().Be("player-gen-v4");
-        WorldRuleSet.Version.Should().Be("world-rules-v19");
+        SquadTemplate.Version.Should().Be("squad-template-v2");
+        WorldRuleSet.Version.Should().Be("world-rules-v20");
     }
 
     private static int StrengthOf(IReadOnlyList<GeneratedSquadMember> squad) =>

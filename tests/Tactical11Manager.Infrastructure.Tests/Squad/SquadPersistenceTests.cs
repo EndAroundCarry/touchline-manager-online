@@ -326,7 +326,7 @@ public sealed class SquadPersistenceTests
         var season = await db.Seasons.FirstAsync(candidate => candidate.WorldId == world.Id);
 
         var divisionId = Guid.CreateVersion7();
-        var division = Division.Provision(divisionId, club.CountryId, tierNumber: 1, "Testland", season.Id, now);
+        var division = Division.Provision(divisionId, club.CountryId, tierNumber: 1, leagueNumber: 1, parentDivisionId: null, "Testland", season.Id, now);
         division.Activate(now);
         db.Divisions.Add(division);
 
