@@ -36,7 +36,7 @@ export type FixturesTab = 'upcoming' | 'results';
  *
  * The manager's club's season in two tabs: what is still to play (with the next fixture called out beside its
  * deadline) and what has been played, newest first, so the latest result is never a scroll away. The list is
- * bounded to 34 fixtures per club (§10.5), so it needs no pagination and no virtual scroll.
+ * bounded to 30 fixtures per club (§10.5), so it needs no pagination and no virtual scroll.
  *
  * The countdown is the one thing here that moves, so it is driven by a signal on a slow interval rather
  * than left to a one-off render — a deadline that never ticks down would be worse than no countdown. The

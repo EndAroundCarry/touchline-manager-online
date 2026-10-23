@@ -25,7 +25,7 @@ import {
  * The club step of onboarding (master plan §10.2, `WORLD-8`).
  *
  * Only the lowest active tier is offered, and taken clubs are shown as taken rather than removed: a
- * manager who can see that eleven of eighteen clubs are gone understands why the remaining ones matter.
+ * manager who can see that ten of sixteen clubs are gone understands why the remaining ones matter.
  *
  * Taking a club over is a choice between two starts (`TKO-1`): keep it exactly as it is, with its squad, debts and
  * ground, or a clean start, which releases the old players to the free agents and begins with the tier's default squad,

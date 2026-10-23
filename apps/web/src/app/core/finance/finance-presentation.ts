@@ -168,7 +168,7 @@ export function streamRows(
     .filter((row) => row.forecastMinor !== 0 || row.actualMinor !== 0);
 }
 
-/** The prize that would be paid at the present place, in words: "7th of 18". */
+/** The prize that would be paid at the present place, in words: "7th of 16". */
 export function placeLabel(place: number, clubs: number): string {
   return `${ordinalOf(place)} of ${clubs}`;
 }

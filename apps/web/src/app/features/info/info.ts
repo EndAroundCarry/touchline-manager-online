@@ -74,7 +74,7 @@ export const INFO_DOCUMENTS: readonly InfoDocument[] = [
         heading: 'The competition',
         bullets: [
           'Six countries each run their own national pyramid. You manage one club in one of them.',
-          'Every division has 18 clubs, and one season is 34 matchdays: you meet each rival once at home and once away.',
+          'Every division has 16 clubs, and one season is 30 matchdays: you meet each rival once at home and once away.',
           "A win is worth three points, a draw one, and a defeat none. Clubs level on points are separated by goal difference, then goals scored, then a fixed list of further criteria shown on your division's rules screen.",
           'At the rollover three clubs are promoted and three relegated between neighbouring divisions. The lowest division relegates nobody, and the top division promotes nobody, because there is no division beyond it.',
         ],

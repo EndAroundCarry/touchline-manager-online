@@ -22,7 +22,7 @@ const OBJECTIVE_LABELS: Record<SeasonObjective, string> = {
   top_three: 'Finish in the top 3',
   top_six: 'Finish in the top 6',
   top_half: 'Finish in the top half',
-  eleventh: 'Finish 11th or better',
+  eleventh: 'Finish mid-table or better',
   stay_up: 'Stay up',
 };
 

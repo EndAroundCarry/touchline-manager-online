@@ -37,7 +37,7 @@ function row(rank: number, clubId = `club-${rank}`): DivisionTableRow {
   };
 }
 
-const TABLE = Array.from({ length: 18 }, (_, index) => row(index + 1));
+const TABLE = Array.from({ length: 16 }, (_, index) => row(index + 1));
 
 describe('tableWindow', () => {
   it('centres the window on the club', () => {
@@ -52,9 +52,9 @@ describe('tableWindow', () => {
   });
 
   it('pins to the bottom when the club is near it', () => {
-    const window = tableWindow(TABLE, 'club-17', 9);
+    const window = tableWindow(TABLE, 'club-15', 9);
 
-    expect(window[window.length - 1].rank).toBe(18);
+    expect(window[window.length - 1].rank).toBe(16);
     expect(window).toHaveLength(9);
   });
 

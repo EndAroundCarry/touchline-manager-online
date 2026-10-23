@@ -29,6 +29,8 @@ describe('sponsor presentation', () => {
     expect(objectiveWithPlace('win_league', 1)).toBe('Win the league');
     expect(objectiveWithPlace('top_three', 3)).toBe('Finish in the top 3 (3rd or better)');
     expect(objectiveWithPlace('stay_up', 13)).toBe('Stay up (13th or better)');
+    // The place comes from the server, so the label itself names no place.
+    expect(objectiveWithPlace('eleventh', 11)).toBe('Finish mid-table or better (11th or better)');
   });
 
   it('falls back to the code for an objective it does not know', () => {

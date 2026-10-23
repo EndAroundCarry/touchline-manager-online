@@ -52,7 +52,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     summary:
       'Every division runs by the same settled rules, and the server is the only authority on them.',
     points: [
-      'Every division has 18 clubs, and one season is 34 matchdays: you meet each rival once at home and once away.',
+      'Every division has 16 clubs, and one season is 30 matchdays: you meet each rival once at home and once away.',
       "A win is worth three points, a draw one, and a defeat none. Clubs that finish level are separated by goal difference, then goals scored, then a fixed list of further criteria: your division's rules screen shows that list, and the draw the season was given.",
       'At the end of a season three clubs are promoted and three relegated between neighbouring divisions. The lowest division relegates nobody, and the top division promotes nobody, because there is no division beyond it.',
       'If you stop signing in, the game looks after your club before it takes it from you: ten days without a login brings a warning, fourteen hands routine decisions to the AI, and twenty-one closes your tenure. Signing in at any point is how you take full control back.',
@@ -108,9 +108,9 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
   {
     id: 'season',
     title: 'The season and the rollover',
-    summary: 'A season is 34 matchdays, then a short rollover, then the next one begins.',
+    summary: 'A season is 30 matchdays, then a short rollover, then the next one begins.',
     points: [
-      'A season runs its 34 matchdays, then the game takes seven days to close the season and open the next one.',
+      'A season runs its 30 matchdays, then the game takes nine days to close the season and open the next one.',
       'Promotion and relegation are applied only at the rollover, once every result and every table is final. A club that moves keeps its squad, its contracts, its cash and its history.',
       'Contracts advance a year at the rollover rather than on a real-world anniversary. The board automatically renews every expiring contract at the rollover, so you never lose a player when a deal runs out.',
       'An older player may announce that the coming season is their last. The announcement reaches your inbox, so you can plan for the place it leaves.',

@@ -96,7 +96,7 @@ export interface WageImpact {
   /** The cash the club would hold at the season's end after the fee, at today's rates. */
   readonly seasonEndCashMinor: number;
 
-  /** The matchday, 1 to 34, the club would first be in the red, or null when it would not be within the season. */
+  /** The matchday, 1 to 30, the club would first be in the red, or null when it would not be within the season. */
   readonly redFromMatchday: number | null;
   readonly needsConfirmation: boolean;
 }

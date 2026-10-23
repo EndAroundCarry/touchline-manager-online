@@ -115,7 +115,7 @@ export class Finances {
     return moneyToneClass(tone);
   }
 
-  /** The prize's place in words: "7th of 18". */
+  /** The prize's place in words: "7th of 16". */
   protected place(place: number, clubs: number): string {
     return placeLabel(place, clubs);
   }

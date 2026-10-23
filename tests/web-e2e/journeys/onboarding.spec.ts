@@ -26,7 +26,7 @@ test.describe('onboarding', () => {
 
     // Step two: the country. Every country is listed with how many of its clubs are free.
     await expect(page.getByRole('heading', { name: 'Choose your country' })).toBeVisible();
-    await expect(page.getByText(/18 clubs, \d+ available/).first()).toBeVisible();
+    await expect(page.getByText(/16 clubs, \d+ available/).first()).toBeVisible();
 
     await page
       .getByRole('button', { name: 'See the clubs' })

@@ -10,7 +10,7 @@ export function outlook(overrides: Partial<FinanceOutlook> = {}): FinanceOutlook
     embargo: false,
     administrationMatchdaysLeft: null,
     matchdaysPlayed: 10,
-    matchdaysInSeason: 34,
+    matchdaysInSeason: 30,
     seasonWageMinor: 700_000_000,
     wageBudgetMinor: 840_000_000,
     wageShareBp: 5_800,
@@ -28,7 +28,7 @@ export function outlook(overrides: Partial<FinanceOutlook> = {}): FinanceOutlook
       { category: 'structure_upkeep', forecastMinor: -20_000_000 },
       { category: 'ground_upkeep', forecastMinor: -10_000_000 },
     ],
-    prize: { place: 7, clubs: 18, amountMinor: 300_000_000 },
+    prize: { place: 7, clubs: 16, amountMinor: 300_000_000 },
     ...overrides,
   };
 }
@@ -79,7 +79,7 @@ function offer(kind: SponsorOffer['kind'], fixedSeasonMinor: number, bonus: numb
     kind,
     sponsorName: `${kind} sponsor`,
     fixedSeasonMinor,
-    fixedMatchdayMinor: Math.floor(fixedSeasonMinor / 34),
+    fixedMatchdayMinor: Math.floor(fixedSeasonMinor / 30),
     bonusMultiplierBp: 10_000,
     objectives: [
       { objective: 'win_league', targetPlace: 1, bonusMetMinor: bonus * 3, bonusExceededMinor: 0 },

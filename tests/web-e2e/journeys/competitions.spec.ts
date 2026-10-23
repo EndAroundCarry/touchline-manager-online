@@ -7,7 +7,7 @@ import { confirmKitColours } from '../support/kit-colours';
 /**
  * The Stage 6 criterion for the division table (F-21, `TBL-1`…`TBL-11`).
  *
- * A manager onboards, opens the table from the navigation, and sees their division's eighteen clubs in
+ * A manager onboards, opens the table from the navigation, and sees their division's sixteen clubs in
  * the order the server ranked them, with their own club marked. The journey proves what a unit test
  * cannot: that the screen reaches the real endpoint, that resolving the manager's division from their
  * club works through the browser, and that the row the server carried back is the row that is marked.
@@ -74,8 +74,8 @@ test.describe('division table', () => {
     await expect(page).toHaveURL(/\/competitions$/);
     await expect(page.getByRole('heading', { name: mine.divisionName })).toBeVisible();
 
-    // Eighteen clubs, one per row, in the order the server ranked them (TBL-1…TBL-11).
-    await expect(page.locator('tbody tr')).toHaveCount(18);
+    // Sixteen clubs, one per row, in the order the server ranked them (TBL-1…TBL-11).
+    await expect(page.locator('tbody tr')).toHaveCount(16);
 
     // The manager's own row is a row header naming their club, and it is marked in words rather than by
     // a tint alone (§11.3).

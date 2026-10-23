@@ -73,7 +73,7 @@ const DASHBOARD: ClubDashboard = {
     tierNumber: 1,
     displayName: 'English Tier 1',
     status: 'active',
-    capacity: 18,
+    capacity: 16,
   },
   season: {
     id: 'season-1',

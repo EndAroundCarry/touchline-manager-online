@@ -92,7 +92,7 @@ describe('Finances', () => {
     expect(cash.textContent).toContain('5m');
     expect(cash.getAttribute('title')).toBe('5,000,000.00');
     expect(text('[data-testid="forecast"]')).toContain('12m');
-    expect(text('dl')).toContain('10 of 34 matchdays played');
+    expect(text('dl')).toContain('10 of 30 matchdays played');
   });
 
   it('says nothing about the state while the club is healthy', () => {
@@ -146,7 +146,7 @@ describe('Finances', () => {
 
   it('says what the league would pay if the season ended today', () => {
     expect(text('[data-testid="prize-today-amount"]')).toBe(
-      'If the season ended today: 7th of 18 → 3m',
+      'If the season ended today: 7th of 16 → 3m',
     );
   });
 

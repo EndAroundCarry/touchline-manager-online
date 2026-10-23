@@ -133,16 +133,16 @@ describe('creditsOf and debitsOf', () => {
 
 describe('placeLabel', () => {
   it.each([
-    [1, '1st of 18'],
-    [2, '2nd of 18'],
-    [3, '3rd of 18'],
-    [7, '7th of 18'],
-    [11, '11th of 18'],
-    [12, '12th of 18'],
-    [13, '13th of 18'],
-    [18, '18th of 18'],
+    [1, '1st of 16'],
+    [2, '2nd of 16'],
+    [3, '3rd of 16'],
+    [7, '7th of 16'],
+    [11, '11th of 16'],
+    [12, '12th of 16'],
+    [13, '13th of 16'],
+    [16, '16th of 16'],
   ])('writes place %i as %s', (place, text) => {
-    expect(placeLabel(place, 18)).toBe(text);
+    expect(placeLabel(place, 16)).toBe(text);
   });
 });
 
