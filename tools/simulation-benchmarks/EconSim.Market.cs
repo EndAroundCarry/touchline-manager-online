@@ -22,6 +22,8 @@ internal sealed partial class EconSim
             Listings.Remove(listing);
             listing.Player.Listed = false;
 
+            var signed = false;
+
             if (listing.LeadingClub is { } buyer)
             {
                 buyer.Reserved -= listing.Leading!.Value;
@@ -32,7 +34,17 @@ internal sealed partial class EconSim
                     buyer.Books.FeesPaid += listing.Leading.Value;
                     Sign(buyer, listing, listing.Leading.Value);
                     Transfers.Add(new TransferRecord(Season, WeekOfSeason, listing.Player.Ability, listing.Player.AgeIn(GameYear), listing.Player.Potential, listing.Leading.Value, 0, buyer.Tier, Pool: true, EconRules.Value(listing.Player.AbilityTenths, listing.Player.AgeIn(GameYear))));
+                    signed = true;
                 }
+            }
+
+            if (signed)
+            {
+                Counter.PoolSigned++;
+            }
+            else
+            {
+                Counter.PoolUnsigned++;
             }
         }
     }
@@ -70,6 +82,7 @@ internal sealed partial class EconSim
     private void AddPoolListing(SimPlayer player, EconFreeAgentQuote quote, bool released)
     {
         player.Listed = true;
+        Counter.PoolOffered++;
         Listings.Add(new SimListing
         {
             Id = MakeGuid(5, _listingOrdinal++),

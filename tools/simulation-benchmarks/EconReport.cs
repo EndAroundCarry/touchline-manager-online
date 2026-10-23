@@ -128,6 +128,7 @@ internal static class EconReport
         Summary(text, targets);
         Prices(text);
         SeasonTable(text, results, rows, seasons);
+        WageBudgetBaseline(text, results, rows, seasons);
         FeeTable(text, results, seasons);
         AgeProfile(text, results);
         Archetypes(text, results, rows, seasons);
@@ -221,6 +222,117 @@ internal static class EconReport
         }
 
         text.AppendLine();
+    }
+
+    // ---- the wage-budget baseline (plan composed-backus) --------------------------------------------------------------------------------
+
+    /// <summary>The season the long-run drift is read from: tier mean skill and wage share are compared from here to the last season.</summary>
+    private const int DriftFromSeason = 15;
+
+    private static readonly int[] ShownSeasons = [1, 5, 10, 15, 20, 25, 30];
+
+    private static void WageBudgetBaseline(StringBuilder text, List<Result> results, List<ClubSeasonRow> rows, int seasons)
+    {
+        var ai = rows.Where(row => row.Manager == "AI").ToList();
+        var counters = results.SelectMany(result => result.Sim.Counters.Select(entry => (entry.Key, Counter: entry.Value))).ToList();
+        var lines = new List<string>();
+
+        text.AppendLine("## 3d. Wage-budget baseline (plan composed-backus)");
+        text.AppendLine();
+        text.AppendLine("Computer clubs only, pooled over the seeds. Mean skill is the mean of a club's players' skills in tenths (what the market prices), averaged over the clubs of the tier. The drift columns read the last season against season " + DriftFromSeason.ToString(Inv) + "; the slope is the least-squares line through the tier means from season " + DriftFromSeason.ToString(Inv) + " to the last.");
+        text.AppendLine();
+
+        var shown = ShownSeasons.Where(season => season <= seasons).ToList();
+
+        text.AppendLine($"| Tier | {string.Join(" | ", shown.Select(season => $"Skill S{season}"))} | Skill change S{DriftFromSeason} to S{seasons} | Slope per season | Median wage share S{DriftFromSeason} to S{seasons} |");
+        text.AppendLine($"|---|{string.Concat(Enumerable.Repeat("---|", shown.Count))}---|---|---|");
+
+        for (var tier = 1; tier <= EconSim.Tiers; tier++)
+        {
+            double Skill(int season)
+            {
+                var group = ai.Where(row => row.Season == season && row.Tier == tier).ToList();
+
+                return group.Count == 0 ? 0 : group.Average(row => row.MeanSkill);
+            }
+
+            double WageShare(int season) => Median(ai.Where(row => row.Season == season && row.Tier == tier).ToList(), row => row.WageShare);
+
+            var drift = seasons > DriftFromSeason;
+            var points = drift ? Enumerable.Range(DriftFromSeason, seasons - DriftFromSeason + 1).Select(season => (X: (double)season, Y: Skill(season))).ToList() : [];
+            var slope = points.Count < 2 ? 0 : Slope(points);
+
+            text.AppendLine(string.Create(
+                Inv,
+                $"| {tier} | {string.Join(" | ", shown.Select(season => $"{Skill(season):0.00}"))} | {(drift ? $"{Skill(seasons) - Skill(DriftFromSeason):+0.00;-0.00}" : "-")} | {(drift ? $"{slope:+0.000;-0.000}" : "-")} | {(drift ? $"{WageShare(DriftFromSeason):P0} to {WageShare(seasons):P0} ({(WageShare(seasons) - WageShare(DriftFromSeason)) * 100:+0;-0} points)" : "-")} |"));
+
+            if (drift)
+            {
+                lines.Add(string.Create(Inv, $"tier {tier} skill {Skill(seasons) - Skill(DriftFromSeason):+0.00;-0.00} ({slope:+0.000;-0.000}/season), wage share {(WageShare(seasons) - WageShare(DriftFromSeason)) * 100:+0;-0} points since S{DriftFromSeason}"));
+            }
+        }
+
+        text.AppendLine();
+
+        // The success criteria of the plan, read on the baseline so the later milestones can be set beside it.
+        var aiSeasons = ai.Count;
+        var cells = Enumerable.Range(1, seasons)
+            .SelectMany(season => Enumerable.Range(1, EconSim.Tiers).Select(tier => ai.Where(row => row.Season == season && row.Tier == tier).ToList()))
+            .Where(group => group.Count > 0)
+            .ToList();
+        var seasonOne = Enumerable.Range(1, EconSim.Tiers).Select(tier => Median(ai.Where(row => row.Season == 1 && row.Tier == tier).ToList(), row => row.WageShare)).ToList();
+        var orderBreaks = Enumerable.Range(1, seasons).Count(season =>
+        {
+            var means = Enumerable.Range(1, EconSim.Tiers).Select(tier => ai.Where(row => row.Season == season && row.Tier == tier).Select(row => row.MeanSkill).DefaultIfEmpty(0).Average()).ToList();
+
+            return means.Zip(means.Skip(1), (upper, lower) => upper <= lower).Any(broken => broken);
+        });
+        var after = counters.SelectMany(entry => entry.Counter.SquadsAfterRollover).ToList();
+        var replacements = counters.Sum(entry => entry.Counter.Replacements);
+        var releases = counters.Sum(entry => entry.Counter.Releases);
+        var offered = counters.Sum(entry => entry.Counter.PoolOffered);
+        var signed = counters.Sum(entry => entry.Counter.PoolSigned);
+        var unsigned = counters.Sum(entry => entry.Counter.PoolUnsigned);
+        var worlds = Math.Max(1, results.Count);
+
+        text.AppendLine("| Measure | Baseline | Plan target |");
+        text.AppendLine("|---|---|---|");
+
+        void Criterion(string name, string value, string target)
+        {
+            text.AppendLine($"| {name} | {value} | {target} |");
+            lines.Add($"{name}: {value}");
+        }
+
+        Criterion("AI club-seasons in the red, all / worst tier-season", $"{Share(ai, row => row.Books.RedMatchdays > 0):P1} / {cells.Max(group => Share(group, row => row.Books.RedMatchdays > 0)):P0}", "3% or less");
+        Criterion("AI club-seasons in administration, all / worst tier-season", $"{Share(ai, row => row.Books.AdminMatchdays > 0):P1} / {cells.Max(group => Share(group, row => row.Books.AdminMatchdays > 0)):P0}", "1% or less");
+        Criterion("AI club-seasons that needed the emergency grant", $"{ai.Count(row => row.Books.Grants > 0)} of {aiSeasons}", "0");
+        Criterion("Highest median wage share, any tier and season", $"{cells.Max(group => Median(group, row => row.WageShare)):P0}", "75% or less");
+        Criterion("Season-1 median wage share, tiers 1 to 4", string.Join(" / ", seasonOne.Select(share => string.Create(Inv, $"{share:P0}"))), "54 / 53 / 54 / 65%, within 3 points");
+        Criterion("AI squad at the season's end, median / 10th percentile", string.Create(Inv, $"{Median(ai, row => row.SquadSize):0.#} / {Percentile(ai, row => row.SquadSize, 0.1):0.#}"), "median 21 or more");
+        Criterion("AI squad after the rollover, median / 10th percentile", after.Count == 0 ? "-" : string.Create(Inv, $"{Median([.. after.Select(size => (double)size)]):0.#} / {Percentile(after, size => size, 0.1):0.#}"), "-");
+        Criterion("SQ-8 emergency replacements per 100 AI club-seasons", after.Count == 0 ? "-" : string.Create(Inv, $"{100.0 * replacements / after.Count:0.0} ({replacements} in {after.Count})"), "1 or less");
+        Criterion("Players the AI let go at the rollover, per AI club-season", after.Count == 0 ? "-" : string.Create(Inv, $"{(double)releases / after.Count:0.00}"), "-");
+        Criterion("Seasons where tier mean skill is not strictly tier 1 > 2 > 3 > 4", $"{orderBreaks} of {seasons}", "0");
+        Criterion("Free-agent pool, offered / signed / unsigned per world and season", string.Create(Inv, $"{(double)offered / worlds / seasons:0.0} / {(double)signed / worlds / seasons:0.0} / {(double)unsigned / worlds / seasons:0.0}"), "-");
+        text.AppendLine();
+
+        Console.WriteLine();
+
+        foreach (var line in lines)
+        {
+            Console.WriteLine($"baseline {line}");
+        }
+    }
+
+    /// <summary>The slope of the least-squares line through the points.</summary>
+    private static double Slope(List<(double X, double Y)> points)
+    {
+        var meanX = points.Average(point => point.X);
+        var meanY = points.Average(point => point.Y);
+        var spread = points.Sum(point => (point.X - meanX) * (point.X - meanX));
+
+        return spread <= 0 ? 0 : points.Sum(point => (point.X - meanX) * (point.Y - meanY)) / spread;
     }
 
     // ---- the targets ------------------------------------------------------------------------------------------------------------------
@@ -482,13 +594,13 @@ internal static class EconReport
 
         targets.Add(new TargetResult(
             12,
-            "A clean-start squad's wages are 55-65% of the forecast; a clean-start tier-1 club after season 3 is usually relegated, then regrows",
+            "A clean-start squad's wages are 65-80% of the forecast (the fair template, priced by the market-skill curve); a clean-start tier-1 club after season 3 is usually relegated, then regrows",
             "clean start",
             cleanShares.Count == 0
                 ? "no clean start ran"
                 : string.Create(Inv, $"{cleanShares.Count} clean starts: squad wages {cleanShares.Min():P0} to {cleanShares.Max():P0} of a fresh club's forecast; the club's seasons from season {EconSim.CleanStartSeason}: {cleanTrack}"),
             cleanShares.Count == 0 ? "none" : string.Create(Inv, $"wages {cleanShares.Min():P0}-{cleanShares.Max():P0} of forecast; {cleanTrack}"),
-            cleanShares.Count > 0 && cleanShares.All(share => share is >= 0.55 and <= 0.65)));
+            cleanShares.Count > 0 && cleanShares.All(share => share is >= 0.65 and <= 0.80)));
 
         // 13. prize weight.
         var prize = Enumerable.Range(1, EconSim.Tiers)

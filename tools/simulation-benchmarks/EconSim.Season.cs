@@ -155,6 +155,7 @@ internal sealed partial class EconSim
         club.ShadowMin,
         club.Squad.Count,
         club.Squad.Count == 0 ? 0 : club.Squad.Average(player => player.Ability),
+        club.Squad.Count == 0 ? 0 : club.Squad.Average(player => player.AbilityTenths) / 10.0,
         club.Squad.Count(player => player.Ability >= 15),
         club.Squad.Count(player => player.Ability >= 17),
         club.Squad.Count(player => player.Ability >= 19),
@@ -211,6 +212,11 @@ internal sealed partial class EconSim
             RenewContracts(club, nextYear);
             TakeInYouth(club);
             Repair(club);
+
+            if (!club.Managed)
+            {
+                Counter.SquadsAfterRollover.Add(club.Squad.Count);
+            }
 
             var order = club.Squad.OrderByDescending(player => player.Ability).ThenBy(player => player.Id).ToList();
 
@@ -270,6 +276,7 @@ internal sealed partial class EconSim
             else
             {
                 Detach(club, player);
+                Counter.Releases++;
             }
         }
     }
@@ -363,6 +370,11 @@ internal sealed partial class EconSim
             player.Status = SquadStatus.Prospect;
             club.Squad.Add(player);
             added++;
+
+            if (!club.Managed)
+            {
+                Counter.Replacements++;
+            }
         }
     }
 
@@ -398,7 +410,7 @@ internal sealed partial class EconSim
             Detach(club, player);
         }
 
-        // The new squad is sized: wages 55-65% of a fresh club's forecast (plan section 8).
+        // The new squad is sized: wages 65-80% of a fresh club's forecast (plan section 8).
         foreach (var player in SizedSquad(
             club,
             draw => new SquadGenerationRequest(

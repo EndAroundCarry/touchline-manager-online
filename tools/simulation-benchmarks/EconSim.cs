@@ -112,12 +112,17 @@ internal sealed partial class EconSim
     {
         List<SimPlayer>? best = null;
         var bestDistance = long.MaxValue;
+        var draws = TemplateSquads ? 1 : EconomyRuleSet.SquadSizingDraws;
 
-        for (var draw = 0; draw < EconomyRuleSet.SquadSizingDraws; draw++)
+        for (var draw = 0; draw < draws; draw++)
         {
             var squad = new List<SimPlayer>();
 
-            foreach (var member in PlayerGenerator.GenerateSquad(request(draw)))
+            // Plan cheeky-dongarra: the world's squads are the tier's fair template, with fixed wages, so there is nothing to size. ECON_SQUADS=sized
+            // draws the old random squads sized to the wage band, for a comparison.
+            var generated = TemplateSquads ? PlayerGenerator.GenerateTemplateSquad(request(draw)) : PlayerGenerator.GenerateSquad(request(draw));
+
+            foreach (var member in generated)
             {
                 var player = FromGenerated(member.Player, member.Attributes, member.State, gem: false);
 
@@ -144,6 +149,9 @@ internal sealed partial class EconSim
 
         return best!;
     }
+
+    /// <summary>The world draws the tier's fair template squads (the game today); ECON_SQUADS=sized turns it back to the random sized squads.</summary>
+    public static bool TemplateSquads { get; } = !string.Equals(Environment.GetEnvironmentVariable("ECON_SQUADS"), "sized", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Each player's age, skill and ceiling when the world opened, for the age profile in the report.</summary>
     public List<(int Age, int Ability, int Potential, double Own)> Opening { get; } = [];
@@ -192,6 +200,11 @@ internal sealed partial class EconSim
     public List<SimListing> Listings { get; } = [];
 
     public List<ClubSeasonRow> Rows { get; } = [];
+
+    /// <summary>Squad and free-agent counts by season; the rollover at the end of a season counts in that season.</summary>
+    public Dictionary<int, SeasonCounters> Counters { get; } = [];
+
+    private SeasonCounters Counter => Counters.TryGetValue(Season, out var counter) ? counter : Counters[Season] = new SeasonCounters();
 
     public List<TransferRecord> Transfers { get; } = [];
 

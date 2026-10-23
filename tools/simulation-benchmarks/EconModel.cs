@@ -278,6 +278,28 @@ internal sealed class SimListing
     public bool IsPool => Seller is null;
 }
 
+/// <summary>What the squads and the free-agent pool did in one season, for the wage-budget baseline (plan composed-backus). The first two count computer clubs only.</summary>
+internal sealed class SeasonCounters
+{
+    /// <summary>SQ-8 emergency replacements generated at the rollover.</summary>
+    public int Replacements;
+
+    /// <summary>Expiring players the AI contract policy let go at the rollover.</summary>
+    public int Releases;
+
+    /// <summary>The squad sizes of the computer clubs once the rollover is done (renewals, youth and repair).</summary>
+    public List<int> SquadsAfterRollover { get; } = [];
+
+    /// <summary>The free agents offered in the season's weekly batches: new players and the released.</summary>
+    public int PoolOffered;
+
+    /// <summary>The offered free agents a club signed.</summary>
+    public int PoolSigned;
+
+    /// <summary>The offered free agents nobody signed, who leave the game.</summary>
+    public int PoolUnsigned;
+}
+
 internal sealed record TransferRecord(int Season, int Week, int Ability, int Age, int Potential, long Fee, int SellerTier, int BuyerTier, bool Pool, long Value);
 
 internal sealed record TradeRecord(
@@ -321,6 +343,7 @@ internal sealed record ClubSeasonRow(
     long ShadowMin,
     int SquadSize,
     double MeanAbility,
+    double MeanSkill,
     int Players15,
     int Players17,
     int Players19,

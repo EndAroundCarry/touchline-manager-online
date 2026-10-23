@@ -43,6 +43,8 @@ using Tactical11Manager.SimulationBenchmarks;
 // `econ seeds seed [seasons]` runs the economy sandbox (plan toasty-scott): one country of 4 tiers of the game's division size through ten seasons on the game's own
 // pure rule code, scripted managers beside the AI clubs, and writes the season tables, the target checks and the report. Not part of `all`.
 //
+// `tickfair N seed` plays the fair template squads of tier 1 and tier 2 against each other and against the old random squads (plan cheeky-dongarra). Not part of `all`.
+//
 // `tickmatrix N` plays every formation against every other, N matches each; `ticksnap N file` replays a tab-separated export of stored
 // snapshots (see TickCalibration). Neither is part of `all`.
 //
@@ -132,6 +134,12 @@ if (mode is "offball")
 if (mode is "tick")
 {
     TickProbe.Run(Math.Min(count, 600), seed, rules, dumpPath);
+}
+
+if (mode is "tickfair")
+{
+    // tickfair [matches a cell] [seed]   (plan cheeky-dongarra: the template squads against the old random ones and against each other)
+    TickFairProbe.Run(Math.Min(count, 600), seed, rules, positional.Length > 3 ? positional[3] : string.Empty);
 }
 
 if (mode is "tickshowmany")
@@ -283,13 +291,13 @@ if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") == "1")
 
 if (mode is "econ" && Environment.GetEnvironmentVariable("ECON_PROBE") != "1")
 {
-    // econ <seeds> <first seed> [seasons]   (the economy sandbox, plan toasty-scott: 4 tiers of the game's division size, matchday steps and the weekly run of the season cycle, the economy rules of the world rules; ECON_OUT sets the folder, default .run-logs/econ; ECON_INTAKE sets the yearly youth intake per computer club, default 2; ECON_TRAIN scales development speed in percent, default 100)
+    // econ <seeds> <first seed> [seasons]   (the economy sandbox, plan toasty-scott: 4 tiers of the game's division size, matchday steps and the weekly run of the season cycle, the economy rules of the world rules; ECON_OUT sets the folder, default .run-logs/econ; ECON_YOUTH (or ECON_INTAKE) sets the yearly youth intake per computer club, 0 or 2, default 2; ECON_SQUADS=sized draws the old random squads; up to 30 seasons; ECON_TRAIN scales development speed in percent, default 100, 150 trains 50% faster)
     EconReport.Run(
         Math.Clamp(positional.Length > 1 && int.TryParse(positional[1], CultureInfo.InvariantCulture, out var econSeeds) ? econSeeds : 3, 1, 10),
         positional.Length > 2 && ulong.TryParse(positional[2], CultureInfo.InvariantCulture, out var econSeed) ? econSeed : 5_000UL,
-        positional.Length > 3 && int.TryParse(positional[3], CultureInfo.InvariantCulture, out var econSeasons) ? Math.Clamp(econSeasons, 1, 12) : 10,
+        positional.Length > 3 && int.TryParse(positional[3], CultureInfo.InvariantCulture, out var econSeasons) ? Math.Clamp(econSeasons, 1, 30) : 10,
         Environment.GetEnvironmentVariable("ECON_OUT") is { Length: > 0 } econOut ? econOut : Path.Combine(".run-logs", "econ"),
-        int.TryParse(Environment.GetEnvironmentVariable("ECON_INTAKE"), CultureInfo.InvariantCulture, out var econIntake) ? Math.Clamp(econIntake, 0, 8) : EconSim.DefaultYouthPerAiClub,
+        int.TryParse(Environment.GetEnvironmentVariable("ECON_YOUTH") ?? Environment.GetEnvironmentVariable("ECON_INTAKE"), CultureInfo.InvariantCulture, out var econIntake) ? Math.Clamp(econIntake, 0, 8) : EconSim.DefaultYouthPerAiClub,
         int.TryParse(Environment.GetEnvironmentVariable("ECON_TRAIN"), CultureInfo.InvariantCulture, out var econTrain) ? Math.Clamp(econTrain, 25, 1000) : 100);
 }
 
