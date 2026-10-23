@@ -71,7 +71,7 @@ Milestone 4 measured and changed nothing; the figures are recorded so the decisi
 - Median end-of-season cash, tier 1: season 5 22M (old 8.8M), season 10 90M (old 31M). Nobody reaches the red or administration.
 - A tier-1 club has 0.0 players of 15 or more in season 1 and 2.0 in season 10 (old 4.0 from season 1).
 - A clean start now costs 16 to 18% of the forecast, not the 55 to 65% band of `CleanStartWageBand*`, which is now only read by tests.
-- The economy sandbox targets 1, 2, 3, 4, 6 and 12 flip to missed. Pricing the template ratings as a higher market skill (a price curve) restored the wage shares, but it made tiers 3 and 4 run into the red late in the run and was taken out; whether to retune is the economy ADR's question (ADR-0084).
+- The economy sandbox targets 1, 2, 3, 4, 6 and 12 flip to missed. Pricing the template ratings as a higher market skill (a price curve) restored the wage shares, but it made tiers 3 and 4 run into the red late in the run and was taken out; the richer clubs are accepted (see Open).
 
 **Match engine.** Absolute attributes are about 1.8 lower than before, and the engine scored more at that level:
 
@@ -82,7 +82,7 @@ Milestone 4 measured and changed nothing; the figures are recorded so the decisi
 | Template tier 2 v tier 2 | **4.27**, 19% of matches with 7+ goals | 2.38, 0 to 3% with 7+ |
 | Tier 1 home v tier 2 | 3.06, 66/22/12 | 2.01, 52/34/14 |
 
-The tier-2 scoring was a keeper whose reaction time crossed a 100 ms tick at Reflexes 19 and 20 (a keeper's dive started a whole tick late). The dive now starts part-way through a tick. The lab sample of all-13 sides fell from 2.98 to 1.47 goals as a side effect; recalibrating the engine is open and is not part of this ADR.
+The tier-2 scoring was a keeper whose reaction time crossed a 100 ms tick at Reflexes 19 and 20 (a keeper's dive started a whole tick late). The dive now starts part-way through a tick. The lab sample of all-13 sides fell from 2.98 to 1.47 goals as a side effect; the goals after the change are accepted (see Open).
 
 **Free agents.** Ability 6 to 10 is now close to a tier-1 squad's lower half (a tier-1 floor of 8 is a quarter of the squad): 33% of free agents are 9 or 10 and upgrade an 8 in either tier for a wage of 26 to 67 thousand. Only humans bid on free agents (`FA-5`), so this is a human lever.
 
@@ -93,13 +93,12 @@ The tier-2 scoring was a keeper whose reaction time crossed a 100 ms tick at Ref
 - Every club of a tier opens equal, to within the seeded diversity. The league of season 1 is decided by managers and by who is human, not by who drew the best random squad.
 - Season 1 has promotion and relegation. A manager who takes a tier-2 club can be promoted in the first season.
 - The AI market starts dead in an equal world: the upgrade clause (a listing better than the weakest player in the family) never fires when every club holds the same ratings. The AI-market tests lift a third of the players by SQL to start from a spread.
-- The clubs are about three times as rich as the old economy allowed, and the matches score differently at low ability. Both are measured above and are decisions for later (the economy ADR, an engine recalibration).
+- The clubs are about three times as rich as the old economy allowed, and the matches score differently at low ability. Both are measured above and both are accepted as they are.
 - Worlds are not migrated (`RULE-4`): a world seeded before this change keeps its random squads and one tier.
 
 ## Open
 
-- **Economy.** Retune the money to the lower ratings, or accept the richer clubs (ADR-0084 is reserved for it).
-- **Engine.** Recalibrate goals after the keeper-dive change, and decide the weaker-side floor.
+- **Accepted as measured (2026-10-23).** The richer clubs are accepted and the economy is not retuned for this change, and the goals per match after the keeper-dive change are accepted, so the engine is not recalibrated for it. ADR-0084 stays reserved for a later economy ADR.
 - **Free agents.** Lower the 6 to 10 range, or leave the pool as a human lever.
 - **Tiers 3 and 4.** Wages still outgrow income there late in a long run; real worlds seed only tiers 1 and 2, so tier 3 opens when a country fills.
 - **Youth and free-agent names** are drawn separately, so they can repeat a squad player's name, and tier 4 repeats names after 55 clubs.
