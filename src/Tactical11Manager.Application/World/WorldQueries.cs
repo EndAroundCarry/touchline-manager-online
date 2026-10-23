@@ -118,7 +118,7 @@ public sealed record CountryCapacityResult(
     CountryCapacityResponse? Capacity);
 
 /// <summary>
-/// Measures a country's lowest active tier and the state of its next-tier generation (`PYR-1`, `PYR-10`).
+/// Measures a country's active tiers and the state of its next-tier generation (`PYR-1`, `PYR-10`).
 /// </summary>
 public sealed class GetCountryCapacity
 {
@@ -179,10 +179,10 @@ public sealed class GetCountryCapacity
             snapshot.CountryId,
             snapshot.LowestActiveTier,
             snapshot.DivisionId,
-            snapshot.ClubsInLowestTier,
+            snapshot.ClubsInCountry,
             snapshot.HumanOccupiedClubs);
 
-        // The provisioning record is only interesting while the tier is full: that is the only time
+        // The provisioning record is only interesting while the country is full: that is the only time
         // onboarding is actually waiting on it.
         var provisioning = rules.NeedsExpansion
             ? await _requests.FindAsync(snapshot.CountryId, rules.TargetTierForExpansion, cancellationToken)
@@ -193,10 +193,10 @@ public sealed class GetCountryCapacity
             snapshot.LowestActiveTier,
             snapshot.DivisionId,
             snapshot.DivisionName,
-            snapshot.ClubsInLowestTier,
+            snapshot.ClubsInCountry,
             snapshot.HumanOccupiedClubs,
             rules.AvailableClubs,
-            rules.LowestTierIsFull,
+            rules.CountryIsFull,
             rules.TargetTierForExpansion,
             provisioning?.ToProvisioningResponse(_options.ProvisioningPollSeconds),
             _clock.UtcNow);
@@ -222,10 +222,10 @@ public enum AvailableClubsOutcome
 public sealed record AvailableClubsResult(AvailableClubsOutcome Outcome, AvailableClubsResponse? Clubs);
 
 /// <summary>
-/// Lists the clubs a manager may take over in a country's lowest active tier (`WORLD-8`, master plan §10.2).
+/// Lists the clubs a manager may take over in any of a country's active tiers (`WORLD-8`, master plan §10.2).
 /// </summary>
 /// <remarks>
-/// The list is the whole tier, with taken clubs marked unavailable rather than hidden. A manager choosing
+/// The list is every active tier, with taken clubs marked unavailable rather than hidden. A manager choosing
 /// between countries wants to see that a league is nearly full — hiding the taken clubs would make a
 /// crowded country look identical to an empty one.
 /// </remarks>
@@ -246,7 +246,7 @@ public sealed class GetAvailableClubs
         _queries = queries;
     }
 
-    /// <summary>Lists the claimable tier.</summary>
+    /// <summary>Lists the claimable tiers.</summary>
     /// <param name="countryId">The country to list.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<AvailableClubsResult> ExecuteAsync(
@@ -267,7 +267,7 @@ public sealed class GetAvailableClubs
             return new AvailableClubsResult(AvailableClubsOutcome.NoActiveDivision, null);
         }
 
-        var clubs = await _queries.GetAvailableClubsAsync(capacity.DivisionSeasonId, cancellationToken);
+        var clubs = await _queries.GetCountryClubsAsync(countryId, cancellationToken);
 
         return new AvailableClubsResult(
             AvailableClubsOutcome.Found,
@@ -284,6 +284,8 @@ public sealed class GetAvailableClubs
                     club.Region,
                     club.BadgeSeed,
                     club.Reputation,
+                    club.TierNumber,
+                    club.DivisionName,
                     club.IsAvailable))],
                 _clock.UtcNow));
     }

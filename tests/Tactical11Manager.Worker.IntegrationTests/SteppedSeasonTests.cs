@@ -27,7 +27,7 @@ namespace Tactical11Manager.Worker.IntegrationTests;
 /// only honest way to prove it drives that pipeline is to let it.
 /// </para>
 /// <para>
-/// It plays a few rounds rather than a whole season: the six divisions share one cadence, so three presses are
+/// It plays a few rounds rather than a whole season: the twelve divisions share one cadence, so three presses are
 /// a few published matchdays and the simulated fixtures of every division — enough to prove the stepped
 /// clock advances the calendar, and bounded enough to stay a fast test. Stepping past the season deadline is
 /// covered by the rollover scheduler's own materialiser, which the advance job invokes alongside the others.
@@ -36,7 +36,7 @@ namespace Tactical11Manager.Worker.IntegrationTests;
 public sealed class SteppedSeasonTests : IAsyncLifetime
 {
     private const int Rounds = 3;
-    private const int Divisions = 6;
+    private const int Divisions = 6 * WorldRuleSet.SeededTiers;
     private const int FixturesPerRound = Divisions * (WorldRuleSet.ClubsPerDivision / 2);
 
     /// <summary>An instant just before the seeded world's first matchday (2026-10-06).</summary>
@@ -156,7 +156,7 @@ public sealed class SteppedSeasonTests : IAsyncLifetime
                 (await db.Matchdays.CountAsync(matchday =>
                         matchday.KickoffAt == target
                         && matchday.PublicationStatus == MatchdayPublicationStatus.Published))
-                    .Should().Be(Divisions, $"all six divisions play round {round} at once");
+                    .Should().Be(Divisions, $"all twelve divisions play round {round} at once");
             }
         }
 

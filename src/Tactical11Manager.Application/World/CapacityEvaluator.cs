@@ -82,7 +82,7 @@ public sealed class CapacityEvaluator
             capacity.CountryId,
             capacity.LowestActiveTier,
             capacity.DivisionId,
-            capacity.ClubsInLowestTier,
+            capacity.ClubsInCountry,
             capacity.HumanOccupiedClubs);
 
         if (!rules.NeedsExpansion)

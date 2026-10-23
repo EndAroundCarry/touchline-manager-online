@@ -76,8 +76,10 @@ public sealed class CleanStartTests
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
-    public void The_squad_costs_a_share_of_a_fresh_clubs_forecast_it_can_carry(int tier)
+    public void The_template_squad_costs_no_more_than_a_fresh_club_can_carry(int tier)
     {
+        // The squad is the tier's fair template (plan cheeky-dongarra), not sized into a wage band, so its bill follows its ratings and falls
+        // below the old 55-65% band; what is still owed is that a fresh club can carry it.
         var (country, club, season) = Fixtures();
 
         var squad = CleanStartSquad.Draw(WorldSeed, country, club, tier, season, Now);
@@ -85,9 +87,9 @@ public sealed class CleanStartTests
         var forecast = EconomyRuleSet.FreshClubForecastMinor(tier);
 
         wages.Should().BeInRange(
-            forecast * EconomyRuleSet.CleanStartWageBandLowBp / 10_000,
+            1,
             forecast * EconomyRuleSet.CleanStartWageBandHighBp / 10_000,
-            "a clean-start squad's wages are 55-65% of the forecast (plan target 12)");
+            "a clean-start squad's wages stay within 65% of the forecast (plan target 12)");
     }
 
     [Theory]

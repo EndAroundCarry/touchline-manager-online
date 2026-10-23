@@ -91,15 +91,16 @@ public sealed class OnboardingTests : IAsyncLifetime
         var capacity = await client.GetFromJsonAsync<CountryCapacityResponse>(
             $"/api/v1/countries/{countryId}/capacity");
 
-        capacity!.LowestActiveTier.Should().Be(1);
-        capacity.ClubsInLowestTier.Should().Be(WorldRuleSet.ClubsPerDivision);
+        capacity!.LowestActiveTier.Should().Be(WorldRuleSet.SeededTiers);
+        capacity.ClubsInCountry.Should().Be(WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision);
         capacity.AvailableClubs.Should().BeGreaterThan(0);
-        capacity.Provisioning.Should().BeNull("nothing is being generated while the tier still has room");
+        capacity.Provisioning.Should().BeNull("nothing is being generated while the country still has room");
 
         var listing = await client.GetFromJsonAsync<AvailableClubsResponse>(
             $"/api/v1/countries/{countryId}/available-clubs");
 
-        listing!.Clubs.Should().HaveCount(WorldRuleSet.ClubsPerDivision);
+        listing!.Clubs.Should().HaveCount(WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision);
+        listing.Clubs.Select(club => club.TierNumber).Distinct().Should().BeEquivalentTo([1, 2], "a manager may take a club in either seeded tier (WORLD-8)");
         listing.Clubs.Single(club => club.Id == clubId).IsAvailable.Should().BeTrue();
 
         // A claim without an idempotency key is refused, because a retried claim would otherwise be a

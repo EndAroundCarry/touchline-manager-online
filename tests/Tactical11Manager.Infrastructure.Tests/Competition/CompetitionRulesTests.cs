@@ -38,7 +38,7 @@ public sealed class CompetitionRulesTests
             from divisionSeason in db.DivisionSeasons
             join division in db.Divisions on divisionSeason.DivisionId equals division.Id
             join country in db.Countries on division.CountryId equals country.Id
-            where country.Code == LaunchCountries.ItalyCode
+            where country.Code == LaunchCountries.ItalyCode && division.TierNumber == 1
             select new
             {
                 divisionSeason.DivisionId,

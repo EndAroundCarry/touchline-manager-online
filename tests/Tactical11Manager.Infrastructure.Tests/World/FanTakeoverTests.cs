@@ -48,7 +48,7 @@ public sealed class FanTakeoverTests : WorldTestBase
         await using var read = Fixture.CreateScope();
         var db = read.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
         var fanBase = await db.ClubFanBases.AsNoTracking().SingleAsync(candidate => candidate.ClubId == clubId);
-        var opening = FanRuleSet.OpeningFor(1);
+        var opening = FanRuleSet.OpeningFor(await TierOfAsync(db, clubId));
         var tenure = await db.ClubTenures.AsNoTracking().SingleAsync(candidate => candidate.ClubId == clubId && candidate.EndedAt == null);
         var takeovers = await db.ClubFanEvents.AsNoTracking()
             .Where(fanEvent => fanEvent.ClubId == clubId && fanEvent.Kind == FanEventKind.Takeover && fanEvent.TenureId == tenure.Id)
@@ -160,10 +160,18 @@ public sealed class FanTakeoverTests : WorldTestBase
             .Where(fanEvent => fanEvent.ClubId == clubId && fanEvent.Kind == FanEventKind.Takeover)
             .ToListAsync();
 
-        fanBase.Fans.Should().Be(FanRuleSet.OpeningFor(1).Fans);
+        fanBase.Fans.Should().Be(FanRuleSet.OpeningFor(await TierOfAsync(db, clubId)).Fans);
         takeovers.Should().HaveCount(takeoversBefore + 2);
         takeovers.Select(fanEvent => fanEvent.TenureId).Should().OnlyHaveUniqueItems("each takeover is its own tenure");
     }
+
+    /// <summary>The tier a club plays in, which sets the fans it opens with: the free club the test is handed may be in either seeded tier.</summary>
+    private static Task<int> TierOfAsync(Tactical11ManagerDbContext db, Guid clubId) =>
+        (from entry in db.ClubSeasonEntries
+         join divisionSeason in db.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+         join division in db.Divisions on divisionSeason.DivisionId equals division.Id
+         where entry.ClubId == clubId
+         select division.TierNumber).SingleAsync();
 
     private async Task<int> CountTakeoversAsync(Guid clubId)
     {

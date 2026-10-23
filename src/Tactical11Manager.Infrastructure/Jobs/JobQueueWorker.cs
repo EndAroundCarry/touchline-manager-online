@@ -28,6 +28,12 @@ public sealed partial class JobQueueWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly JobQueueOptions _options;
     private readonly ILogger<JobQueueWorker> _logger;
+    /// <summary>How many times a job that collided with another transaction is run again at once, before the queue's backoff takes over.</summary>
+    private const int ConflictRetries = 5;
+
+    /// <summary>The longest pause before such a rerun, in milliseconds; each one waits a random time up to this, times the rerun's number.</summary>
+    private const int ConflictPauseMaxMilliseconds = 400;
+
     private readonly string _leaseOwner = $"{Environment.MachineName}:{Environment.ProcessId}";
 
     /// <summary>Initializes the worker.</summary>
@@ -124,11 +130,12 @@ public sealed partial class JobQueueWorker : BackgroundService
         await using var scope = _scopeFactory.CreateAsyncScope();
         var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
 
-        // Resolve the registry from this job's scope rather than capturing it: handlers touch the
-        // scoped unit of work, and a handler invoked with a stale context would corrupt state.
+        // Resolve the registry from a scope rather than capturing it: handlers touch the scoped unit of
+        // work, and a handler invoked with a stale context would corrupt state. The handler itself runs in
+        // a scope of its own, so a rerun after a collision starts clean.
         var handlers = scope.ServiceProvider.GetRequiredService<JobHandlerRegistry>();
 
-        if (!handlers.TryGet(job.JobType, out var handler))
+        if (!handlers.TryGet(job.JobType, out _))
         {
             // An unknown job type is a deployment or configuration defect, not a transient
             // failure: dead-letter it so operations sees it instead of it retrying forever.
@@ -145,7 +152,7 @@ public sealed partial class JobQueueWorker : BackgroundService
 
         try
         {
-            await handler.HandleAsync(job, cancellationToken);
+            await HandleThroughConflictsAsync(job, cancellationToken);
             await queue.CompleteAsync(job.Id, cancellationToken);
 
             LogCompleted(job.JobType, job.BusinessKey, job.Id, job.AttemptCount);
@@ -167,6 +174,45 @@ public sealed partial class JobQueueWorker : BackgroundService
             await queue.FailAsync(job.Id, ex.Message, JobFailureKind.Transient, cancellationToken);
 
             LogTransientFailure(job.JobType, job.BusinessKey, job.Id, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Runs the job's handler, and runs it again at once when it lost a collision with another transaction.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A serialization failure or a deadlock rolls the whole transaction back and asks for it to be run again, so it is not a failure of the job.
+    /// Handing it to the queue would cost the job a retry and a backoff of half a minute or more; with a dozen divisions publishing at one
+    /// kickoff that is a dozen rounds published late, and on a stepped clock, where the queue retries at once, the colliding jobs burn their whole
+    /// attempt budget against each other in seconds. A short random pause spreads the reruns so they stop meeting.
+    /// </para>
+    /// <para>
+    /// Each attempt gets a fresh scope: the failed one leaves its unit of work holding entities from a rolled-back transaction, and reusing it
+    /// would save them a second time. Every handler is already idempotent, because the queue delivers at least once (ADR-0003), so running one
+    /// again here is no different from the queue retrying it.
+    /// </para>
+    /// </remarks>
+    private async Task HandleThroughConflictsAsync(LeasedJob job, CancellationToken cancellationToken)
+    {
+        for (var rerun = 0; ; rerun++)
+        {
+            try
+            {
+                await using var scope = _scopeFactory.CreateAsyncScope();
+
+                scope.ServiceProvider.GetRequiredService<JobHandlerRegistry>().TryGet(job.JobType, out var handler);
+
+                await handler.HandleAsync(job, cancellationToken);
+
+                return;
+            }
+            catch (Exception ex) when (rerun < ConflictRetries && SerializationConflict.IsConflict(ex))
+            {
+                LogConflictRerun(job.JobType, job.BusinessKey, job.Id, rerun + 1, ConflictRetries);
+
+                await Task.Delay(Random.Shared.Next(1, ConflictPauseMaxMilliseconds + 1) * (rerun + 1), cancellationToken);
+            }
         }
     }
 
@@ -233,4 +279,10 @@ public sealed partial class JobQueueWorker : BackgroundService
 
     [LoggerMessage(EventId = 3007, Level = LogLevel.Error, Message = "The job queue batch failed: {Reason}")]
     private partial void LogBatchFailed(Exception exception, string reason);
+
+    [LoggerMessage(
+        EventId = 3008,
+        Level = LogLevel.Information,
+        Message = "Job {JobType} ({BusinessKey}) id {JobId} collided with another transaction; running it again ({Rerun} of {MaxReruns}).")]
+    private partial void LogConflictRerun(string jobType, string businessKey, Guid jobId, int rerun, int maxReruns);
 }

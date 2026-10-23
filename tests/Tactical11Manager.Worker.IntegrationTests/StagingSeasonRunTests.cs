@@ -40,7 +40,7 @@ namespace Tactical11Manager.Worker.IntegrationTests;
 /// <para>
 /// The seasons are played by fabrication, not simulation, exactly as <c>SeasonRolloverTests</c> does: the
 /// point of the run is continuity across seasons, and the matchday pipeline and the engine are pinned by
-/// their own suites. The world is seeded for real, a second tier is provisioned for one country so
+/// their own suites. The world is seeded for real, with tiers 1 and 2 in every country so
 /// three-up/three-down has an adjacent pair to act between, and two human tenures are attached so the
 /// human/AI mix the stage asks for is real.
 /// </para>
@@ -48,6 +48,9 @@ namespace Tactical11Manager.Worker.IntegrationTests;
 public sealed class StagingSeasonRunTests : IAsyncLifetime
 {
     private const int Seasons = 5;
+
+    /// <summary>Every country opens with tiers 1 and 2 (`WORLD-5`).</summary>
+    private const int ClubsInWorld = 6 * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("tactical11_staging_run")
@@ -123,8 +126,6 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
                 .OrderBy(country => country.SortOrder)
                 .Select(country => country.Id)
                 .FirstAsync();
-
-            await ProvisionSecondTierAsync(scope);
 
             await AttachManagerAsync(scope, tierNumber: 1);
             await AttachManagerAsync(scope, tierNumber: 2);
@@ -222,7 +223,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
                 .Be(2, "the second delivery created no third season");
             (await db.ClubSeasonEntries.CountAsync(entry => entry.SeasonId == _seasonId && entry.IsPromoted))
                 .Should()
-                .Be(3, "the movement was not re-applied");
+                .Be(6 * 3, "the movement was not re-applied");
         }
     }
 
@@ -259,7 +260,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
                 .Where(divisionSeason => divisionSeason.SeasonId == next.Id)
                 .ToListAsync();
 
-            nextDivisionSeasons.Should().HaveCount(7, "six seeded tiers and the provisioned second tier");
+            nextDivisionSeasons.Should().HaveCount(6 * WorldRuleSet.SeededTiers, "two seeded tiers in each of six countries");
 
             foreach (var divisionSeason in nextDivisionSeasons)
             {
@@ -302,8 +303,8 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
                 .ToListAsync();
 
             closingEntries.Should().OnlyContain(entry => entry.FinalRank != null, "every entry was closed");
-            closingEntries.Count(entry => entry.IsPromoted).Should().Be(3);
-            closingEntries.Count(entry => entry.IsRelegated).Should().Be(3);
+            closingEntries.Count(entry => entry.IsPromoted).Should().Be(6 * 3);
+            closingEntries.Count(entry => entry.IsRelegated).Should().Be(6 * 3);
 
             var closingFixtures = await db.Fixtures.CountAsync(fixture =>
                 fixture.Status == FixtureStatus.Published
@@ -317,10 +318,10 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
             // The season's money is settled once (FIN-5, FIN-19).
             (await db.ClubSeasonFinances.CountAsync(summary => summary.SeasonId == closing.Id))
                 .Should()
-                .Be(7 * WorldRuleSet.ClubsPerDivision, "every closing club has a finance summary");
+                .Be(ClubsInWorld, "every closing club has a finance summary");
             (await db.LedgerEntries.CountAsync(entry => entry.Category == LedgerCategory.PositionAward))
                 .Should()
-                .Be(7 * WorldRuleSet.ClubsPerDivision * closedSequenceNumber, "every closing club earns a position award each season");
+                .Be(ClubsInWorld * closedSequenceNumber, "every closing club earns a position award each season");
         }
 
         return nextSeasonId;
@@ -339,9 +340,9 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
         (await db.SeasonRollovers.CountAsync(row => row.WorldId == _worldId
             && row.Phase == SeasonRolloverPhase.Completed)).Should().Be(Seasons);
 
-        // Three up and three down every season, and never a duplicate.
-        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsPromoted)).Should().Be(Seasons * 3);
-        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsRelegated)).Should().Be(Seasons * 3);
+        // Three up and three down in every country every season, and never a duplicate.
+        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsPromoted)).Should().Be(Seasons * 6 * 3);
+        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsRelegated)).Should().Be(Seasons * 6 * 3);
 
         // Every club still has a legal squad (SQ-2, SQ-8).
         var roster = scope.ServiceProvider.GetRequiredService<IRosterQueries>();
@@ -364,7 +365,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
         var ledger = await db.LedgerEntries.ToListAsync();
         var byClub = ledger.GroupBy(entry => entry.ClubId).ToDictionary(group => group.Key, group => group.ToList());
 
-        accounts.Should().HaveCount(7 * WorldRuleSet.ClubsPerDivision);
+        accounts.Should().HaveCount(ClubsInWorld);
         accounts.Should().OnlyContain(account => account.CashMinor >= 0 && account.ReservedMinor >= 0);
 
         foreach (var account in accounts)
@@ -508,28 +509,6 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
         }
 
         throw new TimeoutException($"The rollover for season {seasonId} did not complete in time ({lastSeen}).");
-    }
-
-    /// <summary>Provisions a second tier for the run's first country, so an adjacent pair exists.</summary>
-    private async Task ProvisionSecondTierAsync(AsyncServiceScope scope)
-    {
-        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
-
-        var request = DivisionProvisioningRequest.Request(
-            Guid.CreateVersion7(),
-            _countryId,
-            targetTier: 2,
-            _seasonId,
-            $"staging-run-{_countryId:N}",
-            _clock.UtcNow);
-
-        scope.ServiceProvider.GetRequiredService<IDivisionProvisioningRequestRepository>().Add(request);
-        await db.SaveChangesAsync(CancellationToken.None);
-
-        var provisioned = await scope.ServiceProvider.GetRequiredService<ProvisionDivision>()
-            .ExecuteAsync(request.Id, CancellationToken.None);
-
-        provisioned.TargetTier.Should().Be(2);
     }
 
     /// <summary>Attaches a fresh manager to the first club of a tier, so a human holds a club in the run.</summary>

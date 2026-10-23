@@ -334,6 +334,8 @@ public sealed class SeasonRolloverControlsTests
     private sealed class NoOpAdvisoryLock : IAdvisoryLock
     {
         public Task AcquireAsync(AdvisoryLockKey key, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<IAsyncDisposable> HoldAsync(AdvisoryLockKey key, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class RecordingUnitOfWork : IUnitOfWork

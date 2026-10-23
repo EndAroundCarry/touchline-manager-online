@@ -154,7 +154,7 @@ public sealed class ClubClaimTests : WorldTestBase
             .GetRequiredService<IOnboardingQueries>()
             .GetCountryCapacityAsync(countryId, CancellationToken.None);
 
-        capacity!.HumanOccupiedClubs.Should().BeLessThan(capacity.ClubsInLowestTier);
+        capacity!.HumanOccupiedClubs.Should().BeLessThan(capacity.ClubsInCountry);
     }
 
     [Fact]
@@ -227,17 +227,17 @@ public sealed class ClubClaimTests : WorldTestBase
     }
 
     [Fact]
-    public async Task Filling_a_tier_creates_exactly_one_provisioning_request_and_then_refuses_with_capacity()
+    public async Task Filling_a_country_creates_exactly_one_provisioning_request_and_then_refuses_with_capacity()
     {
-        // PYR-2 and PYR-10: the sixteenth manager triggers the next tier; the seventeenth is told to wait
-        // rather than told to pick another club that does not exist.
+        // PYR-2 and PYR-10: the manager who takes the last club of tiers 1 and 2 triggers tier 3; the next is
+        // told to wait rather than told to pick another club that does not exist.
         var countryId = CountryId("GER");
 
         await using (var scope = Fixture.CreateScope())
         {
             var clubIds = await ClubIdsOfAsync(scope, countryId, CancellationToken.None);
 
-            clubIds.Should().HaveCount(WorldRuleSet.ClubsPerDivision);
+            clubIds.Should().HaveCount(WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision);
 
             foreach (var clubId in clubIds)
             {
@@ -259,15 +259,15 @@ public sealed class ClubClaimTests : WorldTestBase
             requests.Should().HaveCount(
                 1,
                 "unique (country_id, target_tier) plus the country lock decides this, not the caller's timing");
-            requests[0].TargetTier.Should().Be(2);
+            requests[0].TargetTier.Should().Be(WorldRuleSet.SeededTiers + 1);
             requests[0].Status.Should().Be(ProvisioningRequestStatus.Requested);
 
             var capacity = await scope.ServiceProvider
                 .GetRequiredService<IOnboardingQueries>()
                 .GetCountryCapacityAsync(countryId, CancellationToken.None);
 
-            capacity!.HumanOccupiedClubs.Should().Be(capacity.ClubsInLowestTier);
-            capacity.ClubsInLowestTier.Should().Be(WorldRuleSet.ClubsPerDivision);
+            capacity!.HumanOccupiedClubs.Should().Be(capacity.ClubsInCountry);
+            capacity.ClubsInCountry.Should().Be(WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision);
 
             var anyClubId = await db.Clubs
                 .Where(club => club.CountryId == countryId)
@@ -282,7 +282,7 @@ public sealed class ClubClaimTests : WorldTestBase
 
             refused.Outcome.Should().Be(ClaimClubOutcome.CapacityProvisioning);
             refused.Provisioning.Should().NotBeNull();
-            refused.Provisioning!.TargetTier.Should().Be(2);
+            refused.Provisioning!.TargetTier.Should().Be(WorldRuleSet.SeededTiers + 1);
             refused.Dashboard.Should().BeNull("PYR-10 forbids partially assigning a club");
 
             (await db.DivisionProvisioningRequests.CountAsync(request => request.CountryId == countryId))
@@ -291,17 +291,17 @@ public sealed class ClubClaimTests : WorldTestBase
     }
 
     [Fact]
-    public async Task Only_the_lowest_active_tier_is_claimable()
+    public async Task Every_active_tier_is_claimable()
     {
-        // WORLD-8: once a lower tier is active, the tier above it stops accepting new managers, and the new
-        // tier is claimable immediately.
+        // WORLD-8: a manager may take a club in any active tier, and a tier that becomes active is claimable
+        // immediately.
         await using var scope = Fixture.CreateScope();
         var countryId = CountryId("ITA");
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
 
         var topTierClubId = await TopTierClubIdAsync(db, countryId, tierNumber: 1);
 
-        var lowerDivisionId = await CreateActiveTierAsync(scope, countryId, tierNumber: 2, CancellationToken.None);
+        var lowerDivisionId = await CreateActiveTierAsync(scope, countryId, WorldRuleSet.SeededTiers + 1, CancellationToken.None);
 
         var lowerTierClubId = await db.ClubSeasonEntries
             .Where(entry => db.DivisionSeasons
@@ -317,15 +317,15 @@ public sealed class ClubClaimTests : WorldTestBase
             topTierClubId,
             NewKey());
 
-        upper.Outcome.Should().Be(ClaimClubOutcome.ClubNotClaimable);
+        upper.Outcome.Should().Be(ClaimClubOutcome.Claimed);
 
-        var lower = await ClaimAsync(
+        var lowest = await ClaimAsync(
             scope,
             await CreateManagerAsync(scope, CancellationToken.None),
             lowerTierClubId,
             NewKey());
 
-        lower.Outcome.Should().Be(ClaimClubOutcome.Claimed);
+        lowest.Outcome.Should().Be(ClaimClubOutcome.Claimed);
     }
 
     [Fact]

@@ -39,40 +39,44 @@ internal sealed class OnboardingQueries : IOnboardingQueries
             return null;
         }
 
-        var division = await _dbContext.Divisions
-            .Where(candidate => candidate.CountryId == countryId
-                && candidate.Status == DivisionStatus.Active)
-            .OrderByDescending(candidate => candidate.TierNumber)
-            .Select(candidate => new { candidate.Id, candidate.TierNumber, candidate.DisplayName })
-            .FirstOrDefaultAsync(cancellationToken);
+        // Every active tier counts: a manager may take any of them, so the country is full only when all are
+        // (WORLD-8, PYR-2). The lowest one is still named, because the pyramid grows below it.
+        var divisions = await (
+            from division in _dbContext.Divisions
+            join divisionSeason in _dbContext.DivisionSeasons on division.Id equals divisionSeason.DivisionId
+            where division.CountryId == countryId
+                && division.Status == DivisionStatus.Active
+                && divisionSeason.SeasonId == season.Value.SeasonId
+            orderby division.TierNumber descending
+            select new
+            {
+                division.Id,
+                division.TierNumber,
+                division.DisplayName,
+                DivisionSeasonId = divisionSeason.Id,
+            })
+            .ToListAsync(cancellationToken);
 
-        if (division is null)
+        if (divisions.Count == 0)
         {
             return null;
         }
 
-        var divisionSeasonId = await _dbContext.DivisionSeasons
-            .Where(candidate => candidate.DivisionId == division.Id && candidate.SeasonId == season.Value.SeasonId)
-            .Select(candidate => (Guid?)candidate.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var lowest = divisions[0];
+        var divisionSeasonIds = divisions.Select(division => division.DivisionSeasonId).ToList();
 
-        if (divisionSeasonId is null)
-        {
-            return null;
-        }
+        var clubsInCountry = await _dbContext.ClubSeasonEntries
+            .CountAsync(entry => divisionSeasonIds.Contains(entry.DivisionSeasonId), cancellationToken);
 
-        var clubsInTier = await _dbContext.ClubSeasonEntries
-            .CountAsync(entry => entry.DivisionSeasonId == divisionSeasonId.Value, cancellationToken);
-
-        var occupied = await OccupiedClubsAsync(divisionSeasonId.Value, cancellationToken);
+        var occupied = await OccupiedClubsAsync(divisionSeasonIds, cancellationToken);
 
         return new CountryCapacitySnapshot(
             countryId,
-            division.TierNumber,
-            division.Id,
-            divisionSeasonId.Value,
-            division.DisplayName,
-            clubsInTier,
+            lowest.TierNumber,
+            lowest.Id,
+            lowest.DivisionSeasonId,
+            lowest.DisplayName,
+            clubsInCountry,
             occupied);
     }
 
@@ -82,6 +86,8 @@ internal sealed class OnboardingQueries : IOnboardingQueries
         CancellationToken cancellationToken) =>
         await (
             from entry in _dbContext.ClubSeasonEntries
+            join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
             join club in _dbContext.Clubs on entry.ClubId equals club.Id
             where entry.DivisionSeasonId == divisionSeasonId
             orderby club.Name
@@ -93,9 +99,47 @@ internal sealed class OnboardingQueries : IOnboardingQueries
                 club.Region,
                 club.BadgeSeed,
                 club.Reputation,
+                division.TierNumber,
+                division.DisplayName,
                 !_dbContext.ClubTenures.Any(tenure => tenure.ClubId == club.Id
                     && tenure.ControlStatus != ClubTenureControlStatus.Closed)))
             .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<AvailableClubRow>> GetCountryClubsAsync(
+        Guid countryId,
+        CancellationToken cancellationToken)
+    {
+        var season = await ResolveCurrentSeasonAsync(cancellationToken);
+
+        if (season is null)
+        {
+            return [];
+        }
+
+        return await (
+            from entry in _dbContext.ClubSeasonEntries
+            join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+            join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+            join club in _dbContext.Clubs on entry.ClubId equals club.Id
+            where division.CountryId == countryId
+                && division.Status == DivisionStatus.Active
+                && divisionSeason.SeasonId == season.Value.SeasonId
+            orderby division.TierNumber, club.Name
+            select new AvailableClubRow(
+                club.Id,
+                club.Name,
+                club.ShortName,
+                club.City,
+                club.Region,
+                club.BadgeSeed,
+                club.Reputation,
+                division.TierNumber,
+                division.DisplayName,
+                !_dbContext.ClubTenures.Any(tenure => tenure.ClubId == club.Id
+                    && tenure.ControlStatus != ClubTenureControlStatus.Closed)))
+            .ToListAsync(cancellationToken);
+    }
 
     /// <inheritdoc />
     public async Task<ClubDashboardSnapshot?> GetClubDashboardAsync(
@@ -183,16 +227,18 @@ internal sealed class OnboardingQueries : IOnboardingQueries
     }
 
     /// <summary>
-    /// Counts the clubs in a tier that hold an open human tenure whose account is not suspended
+    /// Counts the clubs in these tiers that hold an open human tenure whose account is not suspended
     /// (`OCC-8`, decision D-1 of the Stage 0 review).
     /// </summary>
-    private async Task<int> OccupiedClubsAsync(Guid divisionSeasonId, CancellationToken cancellationToken) =>
+    private async Task<int> OccupiedClubsAsync(
+        IReadOnlyCollection<Guid> divisionSeasonIds,
+        CancellationToken cancellationToken) =>
         await (
             from tenure in _dbContext.ClubTenures
             join entry in _dbContext.ClubSeasonEntries on tenure.ClubId equals entry.ClubId
             join manager in _dbContext.Managers on tenure.ManagerId equals manager.Id
             join user in _dbContext.Users on manager.UserId equals user.Id
-            where entry.DivisionSeasonId == divisionSeasonId
+            where divisionSeasonIds.Contains(entry.DivisionSeasonId)
                 && tenure.ControlStatus != ClubTenureControlStatus.Closed
                 && user.Status != Domain.Auth.UserStatus.Suspended
             select tenure.Id)

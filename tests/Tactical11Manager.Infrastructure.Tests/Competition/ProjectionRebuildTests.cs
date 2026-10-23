@@ -235,13 +235,13 @@ public sealed class ProjectionRebuildTests
         result.Applied.Should().BeFalse();
     }
 
-    /// <summary>Finds the German division-season, which no other test in the collection plays in.</summary>
+    /// <summary>Finds the German tier-1 division-season, which no other test in the collection plays in.</summary>
     private static async Task<Guid> GermanDivisionSeasonIdAsync(Tactical11ManagerDbContext db) =>
         await (
             from divisionSeason in db.DivisionSeasons
             join division in db.Divisions on divisionSeason.DivisionId equals division.Id
             join country in db.Countries on division.CountryId equals country.Id
-            where country.Code == LaunchCountries.GermanyCode
+            where country.Code == LaunchCountries.GermanyCode && division.TierNumber == 1
             select divisionSeason.Id)
             .SingleAsync();
 

@@ -29,6 +29,8 @@ describe('ClubChoice', () => {
         region: 'North',
         badgeSeed: 'a',
         reputation: 50,
+        tierNumber: 1,
+        divisionName: 'Premier Division',
         isAvailable: true,
       },
     ],

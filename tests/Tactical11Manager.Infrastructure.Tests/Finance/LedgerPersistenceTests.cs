@@ -44,8 +44,15 @@ public sealed class LedgerPersistenceTests
 
             ledger.Should().ContainSingle("a club's account is funded exactly once (FIN-1)");
             ledger[0].Sequence.Should().Be(1, "the opening balance is the first thing that happened");
-            ledger[0].ResultingCashMinor.Should().Be(account.CashMinor);
             ledger[0].ResultingReservedMinor.Should().Be(0);
+
+            // Other suites in the collection play and claim in the shared world, so the balance only still equals the opening one when nothing
+            // has been posted since.
+            if (account.LastLedgerSequence == 1)
+            {
+                ledger[0].ResultingCashMinor.Should().Be(account.CashMinor);
+            }
+
             ledger[0].SourceType.Should().Be(LedgerSourceType.WorldSeed);
         }
     }

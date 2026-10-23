@@ -156,7 +156,7 @@ public sealed class AiClubEvaluationTests : WorldTestBase
             .LoadAiClubsAsync(CancellationToken.None);
 
         clubs.Should().NotContain(club => club.ClubId == heldClubId, "an open tenure occupies its club (OCC-8)");
-        clubs.Should().HaveCount((6 * WorldRuleSet.ClubsPerDivision) - 1, "every other club in the seeded world is still the AI's");
+        clubs.Should().HaveCount((6 * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision) - 1, "every other club in the seeded world is still the AI's");
 
         // The evaluation is measured against exactly that list, so a held club is never considered — the
         // load is its only input.

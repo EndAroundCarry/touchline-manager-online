@@ -45,6 +45,12 @@ public static class WorldRuleSet
     /// <summary>Every active division holds exactly 16 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 16;
 
+    /// <summary>
+    /// A new world opens with tiers 1 and 2 in every country, so promotion and relegation work from the first
+    /// season (`WORLD-5`). Deeper tiers are provisioned when a country fills up (`PYR-2`).
+    /// </summary>
+    public const int SeededTiers = 2;
+
     /// <summary>A double round-robin season is 30 matchdays (`CAL-1`).</summary>
     public const int MatchdaysPerSeason = 30;
 

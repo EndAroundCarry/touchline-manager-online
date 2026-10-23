@@ -10,7 +10,7 @@ using Tactical11Manager.Domain.World.Generation;
 namespace Tactical11Manager.Application.World;
 
 /// <summary>
-/// The squad a club returns to on a clean start: the tier's default side, drawn to wages a fresh club can carry (`TKO-3`).
+/// The squad a club returns to on a clean start: the tier's fair template squad, drawn afresh (`TKO-3`).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -35,7 +35,7 @@ public static class CleanStartSquad
     /// <param name="worldSeed">The world's generation seed (`PYR-14`).</param>
     /// <param name="country">The club's country.</param>
     /// <param name="club">The club.</param>
-    /// <param name="tier">The tier the club plays in now, which sets the squad's strength and the wages it is sized to.</param>
+    /// <param name="tier">The tier the club plays in now, which sets the squad's template and so its strength and wages.</param>
     /// <param name="season">The season being played.</param>
     /// <param name="now">The current instant.</param>
     public static IReadOnlyList<GeneratedSquadMember> Draw(
@@ -53,7 +53,7 @@ public static class CleanStartSquad
 
         var ordinal = (int)(DeterministicDigest.SeedOf(worldSeed, Label, club.Id.ToString("D")) % OrdinalSpan);
 
-        return PlayerGenerator.GenerateSizedSquad(
+        return PlayerGenerator.GenerateTemplateSquad(
             new SquadGenerationRequest(
                 string.Create(CultureInfo.InvariantCulture, $"{worldSeed}:{Label}:{season.SequenceNumber}"),
                 country.NamePoolKey,
@@ -65,9 +65,7 @@ public static class CleanStartSquad
                 season.Id,
                 season.SequenceNumber,
                 season.GameYear,
-                now),
-            EconomyRuleSet.CleanStartWageBandLowBp,
-            EconomyRuleSet.CleanStartWageBandHighBp);
+                now));
     }
 
     /// <summary>Reads how strong a drawn squad is, on the scale the fans' target and the sponsor's realistic objective use.</summary>

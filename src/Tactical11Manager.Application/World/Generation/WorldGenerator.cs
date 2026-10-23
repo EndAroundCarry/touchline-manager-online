@@ -270,8 +270,9 @@ public sealed class WorldGenerator
         Season season,
         DateTimeOffset now)
     {
-        // The squad is drawn to wages a fresh club of the tier can carry, so no club opens already in the red (FIN-2).
-        var squad = PlayerGenerator.GenerateSizedSquad(
+        // Every club of a tier opens with the same fair squad, apart from a little seeded diversity (SQ-1); its wages follow
+        // its ratings, so they are the same for every club of the tier.
+        var squad = PlayerGenerator.GenerateTemplateSquad(
             new SquadGenerationRequest(
                 seed,
                 country.NamePoolKey,
@@ -283,9 +284,7 @@ public sealed class WorldGenerator
                 season.Id,
                 season.SequenceNumber,
                 season.GameYear,
-                now),
-            EconomyRuleSet.SeededWageBandLowBp,
-            EconomyRuleSet.SeededWageBandHighBp);
+                now));
 
         foreach (var member in squad)
         {

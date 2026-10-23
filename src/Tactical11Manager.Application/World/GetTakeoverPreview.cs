@@ -3,6 +3,7 @@ using Tactical11Manager.Application.Abstractions.Fans;
 using Tactical11Manager.Application.Abstractions.Finance;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Contracts.World;
+using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.World;
@@ -98,14 +99,10 @@ public sealed class GetTakeoverPreview
 
         var placement = await _queries.GetClubDashboardAsync(club.Id, world.CurrentSeasonNumber, cancellationToken);
 
-        if (placement is null || club.Status != ClubStatus.Active || placement.Division.CountryId != club.CountryId)
-        {
-            return Refused(TakeoverPreviewOutcome.ClubNotClaimable);
-        }
-
-        var lowest = await _world.FindLowestActiveDivisionAsync(club.CountryId, cancellationToken);
-
-        if (lowest is null || lowest.Id != placement.Division.Id)
+        if (placement is null
+            || club.Status != ClubStatus.Active
+            || placement.Division.CountryId != club.CountryId
+            || placement.Division.Status != DivisionStatus.Active)
         {
             return Refused(TakeoverPreviewOutcome.ClubNotClaimable);
         }

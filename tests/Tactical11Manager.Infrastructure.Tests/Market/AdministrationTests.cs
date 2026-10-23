@@ -63,6 +63,15 @@ public sealed class AdministrationTests : IAsyncLifetime, IDisposable
     public async Task The_board_of_a_club_in_administration_lists_its_highest_earners_and_releases_the_ones_nobody_buys()
     {
         var (clubId, _, _) = await ArrangeListingAsync();
+
+        // A fair template squad costs little (plan cheeky-dongarra), so the club is made to pay five times the wages: the board only lists
+        // players while the bill is over the wage budget.
+        await using (var wageScope = _fixture.CreateScope())
+        {
+            await wageScope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>().Database.ExecuteSqlInterpolatedAsync(
+                $"update squad.player_contracts set season_wage_minor = season_wage_minor * 5 where club_id = {clubId} and status = 'active'");
+        }
+
         var (limit, cashBefore) = await PutInAdministrationAsync(clubId);
 
         await using (var scope = _fixture.CreateScope())
@@ -99,7 +108,13 @@ public sealed class AdministrationTests : IAsyncLifetime, IDisposable
 
             var cheapestListed = listedPlayerIds.Min(id => wages[id]);
 
-            wages.Where(pair => !listedPlayerIds.Contains(pair.Key)).Should().OnlyContain(pair => pair.Value <= cheapestListed);
+            // A player the club had already put on the market is not the board's to choose, so he is left out of the comparison.
+            var alreadyListed = await db.TransferListings
+                .Where(candidate => candidate.SellerClubId == clubId)
+                .Select(candidate => candidate.PlayerId)
+                .ToListAsync();
+
+            wages.Where(pair => !alreadyListed.Contains(pair.Key)).Should().OnlyContain(pair => pair.Value <= cheapestListed);
 
             (await db.ClubAccounts.SingleAsync(account => account.ClubId == clubId)).FinancialState
                 .Should().Be(FinancialStateKind.Administration);

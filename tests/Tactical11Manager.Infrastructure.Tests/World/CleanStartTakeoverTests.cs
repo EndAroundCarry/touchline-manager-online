@@ -100,11 +100,10 @@ public sealed class CleanStartTakeoverTests : WorldTestBase, IAsyncLifetime, IDi
         newPlayerIds.Should().HaveCountGreaterThanOrEqualTo(WorldRuleSet.SquadMinimumRegistered);
         newPlayerIds.Intersect(oldPlayerIds).Should().BeEmpty();
 
-        // Forty draws look for a squad inside the band and take the nearest when none is, so allow a little either side of it.
-        newWageBill.Should().BeInRange(
-            forecast * (EconomyRuleSet.CleanStartWageBandLowBp - 300) / 10_000,
-            forecast * (EconomyRuleSet.CleanStartWageBandHighBp + 300) / 10_000);
-        newWageBill.Should().BeLessThan(oldWageBill, "the old squad was drawn to 70-92% of the forecast");
+        // The squad is the tier's fair template, not sized into a band, so its bill follows its ratings; a fresh club can carry it.
+        newWageBill.Should().BeInRange(1, forecast * EconomyRuleSet.CleanStartWageBandHighBp / 10_000);
+        // Both squads are the tier's fair template, so their ratings and wages match but for the template's seeded nudges.
+        newWageBill.Should().BeLessThanOrEqualTo(oldWageBill * 102 / 100, "a clean start is never dearer than the founding squad it replaces");
         (await db.PlayerRegistrations.AsNoTracking().CountAsync(registration => registration.ClubId == clubId && registration.Status == RegistrationStatus.Active))
             .Should().Be(newPlayerIds.Count);
 

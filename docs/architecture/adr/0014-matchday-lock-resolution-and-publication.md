@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): a round now has 8 fixtures and a division-season 30 rounds, not 9 and 34; the lock, resolve and publish steps are unchanged.
+- **Amended by:** [ADR-0086](0086-matchday-publications-take-turns.md): publications of different divisions take turns behind one lock held before the serializable transaction begins, so they no longer roll each other back.
 - **Date:** 2026-09-25
 - **Stage:** 6
 - **Related:** [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0004](0004-deterministic-match-engine.md), [ADR-0009](0009-time-identity-and-concurrency.md), master plan §6.6, §7.2–§7.4, game rules `CAL-3`, `CAL-10`, `MAT-1`, `MAT-7`, `MAT-9`, `MAT-10`, `DIS-6`, `TBL-13`

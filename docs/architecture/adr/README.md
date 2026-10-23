@@ -111,3 +111,4 @@ the system is shaped the way it is.
 | [0081](0081-every-attribute-develops-to-a-limit-set-by-potential.md) | Every attribute develops, up to a limit set by the player's potential and position; youth potential has its own scale (`training-v4`) | Accepted |
 | [0082](0082-community-forum.md) | A community forum: an international one (English) and one per country, with threads managers start except in Announcements | Accepted |
 | [0083](0083-sixteen-clubs-and-thirty-matchdays.md) | Divisions hold 16 clubs and a season 30 matchdays on a fixed 11-week cycle; the money, training and fans are retuned so a season is worth what it was | Accepted |
+| [0086](0086-matchday-publications-take-turns.md) | Matchday publications take turns behind a lock held before their serializable transaction, and a job that hits a serialization failure or a deadlock is run again at once | Accepted |

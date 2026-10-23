@@ -24,6 +24,9 @@ namespace Tactical11Manager.Infrastructure.Tests.World;
 /// </remarks>
 public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
 {
+    /// <summary>The tier a full country provisions: tiers 1 and 2 are seeded (`WORLD-5`).</summary>
+    private const int NewTier = WorldRuleSet.SeededTiers + 1;
+
     private readonly ProvisioningFixture _fixture = new();
 
     /// <summary>Starts a freshly seeded world.</summary>
@@ -48,7 +51,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
             var season = await db.Seasons.SingleAsync(candidate => candidate.WorldId == world.Id);
 
             countryId = await db.Countries.OrderBy(country => country.SortOrder).Select(c => c.Id).FirstAsync();
-            requestId = await CreateRequestAsync(scope, countryId, targetTier: 2, season.Id);
+            requestId = await CreateRequestAsync(scope, countryId, targetTier: NewTier, season.Id);
         }
 
         ProvisionDivisionResult result;
@@ -60,7 +63,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
         }
 
         result.Outcome.Should().Be(ProvisionDivisionOutcome.Completed);
-        result.TargetTier.Should().Be(2);
+        result.TargetTier.Should().Be(NewTier);
         result.Clubs.Should().Be(WorldRuleSet.ClubsPerDivision, "PYR-4: a tier holds a full division of clubs");
         result.Players.Should().Be(WorldRuleSet.ClubsPerDivision * WorldRuleSet.GeneratorSquadTarget, "SQ-1: the generator produces its target squad per club");
         result.Accounts.Should().Be(WorldRuleSet.ClubsPerDivision);
@@ -70,7 +73,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
             var db = verify.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
 
             var division = await db.Divisions.SingleAsync(candidate =>
-                candidate.CountryId == countryId && candidate.TierNumber == 2);
+                candidate.CountryId == countryId && candidate.TierNumber == NewTier);
 
             division.Status.Should().Be(DivisionStatus.Active, "PYR-8: the tier is claimable once validated");
 
@@ -109,7 +112,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
             var capacity = await onboarding.ServiceProvider.GetRequiredService<IOnboardingQueries>()
                 .GetCountryCapacityAsync(countryId, CancellationToken.None);
 
-            capacity!.LowestActiveTier.Should().Be(2, "PYR-8: a claim now joins the new tier");
+            capacity!.LowestActiveTier.Should().Be(NewTier, "PYR-8: a claim now joins the new tier");
         }
 
         // A retried run is a no-op: the request is terminal and no second tier exists (ADR-0003).
@@ -125,7 +128,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
         {
             var db = final.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
 
-            (await db.Divisions.CountAsync(candidate => candidate.CountryId == countryId && candidate.TierNumber == 2))
+            (await db.Divisions.CountAsync(candidate => candidate.CountryId == countryId && candidate.TierNumber == NewTier))
                 .Should().Be(1, "PYR-3: one tier is created once");
         }
     }
@@ -134,7 +137,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
     public async Task Provisioning_names_a_new_tier_from_the_world_seed_so_it_cannot_collide()
     {
         // ADR-0033: club identity is seeded from the world seed, not from the per-tier provisioning request
-        // seed. The request seed folds the target tier in, so using it would place tier 2's eighteen-slot
+        // seed. The request seed folds the target tier in, so using it would place tier 3's sixteen-slot
         // window independently on the shared name cycle and could overlap tier 1's — which the unique name
         // index rejects with 23505. This test names the tier's clubs deterministically from the world seed.
         Guid countryId;
@@ -153,7 +156,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
             poolKey = country.NamePoolKey;
             code = country.Code;
 
-            requestId = await CreateRequestAsync(scope, countryId, targetTier: 2, season.Id);
+            requestId = await CreateRequestAsync(scope, countryId, targetTier: NewTier, season.Id);
         }
 
         await using (var scope = _fixture.CreateScope())
@@ -171,25 +174,25 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
                 .Select(club => club.NormalizedName)
                 .ToListAsync();
 
-            allNames.Should().HaveCount(2 * WorldRuleSet.ClubsPerDivision, "PYR-11: two full tiers of clubs");
+            allNames.Should().HaveCount(NewTier * WorldRuleSet.ClubsPerDivision, "PYR-11: three full tiers of clubs");
             allNames.Should().OnlyHaveUniqueItems(
                 "ADR-0033: a provisioned tier must continue the name cycle of the tier above it");
 
-            var tierTwoNames = await (
+            var newTierNames = await (
                 from entry in db.ClubSeasonEntries
                 join divisionSeason in db.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
                 join division in db.Divisions on divisionSeason.DivisionId equals division.Id
                 join club in db.Clubs on entry.ClubId equals club.Id
-                where division.CountryId == countryId && division.TierNumber == 2
+                where division.CountryId == countryId && division.TierNumber == NewTier
                 select club.Name)
                 .ToListAsync();
 
             var expected = ClubIdentityGenerator
-                .GenerateDivision(WorldFixture.Seed, poolKey, code, tierNumber: 2, clubCount: WorldRuleSet.ClubsPerDivision)
+                .GenerateDivision(WorldFixture.Seed, poolKey, code, tierNumber: NewTier, clubCount: WorldRuleSet.ClubsPerDivision)
                 .Select(identity => identity.Name)
                 .ToList();
 
-            tierTwoNames.Should().BeEquivalentTo(
+            newTierNames.Should().BeEquivalentTo(
                 expected,
                 "ADR-0033: the worker names a tier's clubs from the world seed, not the request seed");
         }
@@ -212,7 +215,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
             var season = await db.Seasons.SingleAsync(candidate => candidate.WorldId == world.Id);
 
             countryId = await db.Countries.OrderBy(country => country.SortOrder).Select(c => c.Id).FirstAsync();
-            requestId = await CreateRequestAsync(scope, countryId, targetTier: 2, season.Id);
+            requestId = await CreateRequestAsync(scope, countryId, targetTier: NewTier, season.Id);
 
             divisionSeasonId = Guid.Empty;
         }
@@ -229,7 +232,7 @@ public sealed class ProvisioningTests : IAsyncLifetime, IDisposable
             divisionSeasonId = await (
                 from division in db.Divisions
                 join divisionSeason in db.DivisionSeasons on division.Id equals divisionSeason.DivisionId
-                where division.CountryId == countryId && division.TierNumber == 2
+                where division.CountryId == countryId && division.TierNumber == NewTier
                 select divisionSeason.Id)
                 .SingleAsync();
         }

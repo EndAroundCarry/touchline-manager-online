@@ -2,6 +2,7 @@ using Tactical11Manager.Application.Abstractions;
 using Tactical11Manager.Application.Abstractions.Competition;
 using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.Squad;
+using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Comms;
 using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Finance;
@@ -69,6 +70,12 @@ public sealed record PublishMatchdayResult(PublishMatchdayOutcome Outcome, int P
 /// wrote it in turn would give the second one a table missing the first one's round (`CONC-2`). A
 /// serialization failure is a transient job failure, and the retry re-runs the same deterministic work.
 /// </para>
+/// <para>
+/// Publications take turns (<see cref="AdvisoryLockKey.MatchdayPublication"/>). Two divisions share no table row, but they share pages of
+/// the accounts, tables, fan bases and player states, and the serializable checks work on pages: a dozen divisions publishing at one
+/// kickoff rolled each other back until one ran out of retries. The turn is taken before the transaction begins, so the snapshot it reads
+/// is never older than the previous publication's commit.
+/// </para>
 /// </remarks>
 public sealed class PublishMatchday
 {
@@ -78,6 +85,7 @@ public sealed class PublishMatchday
     private readonly MatchdayNotifications _notifications;
     private readonly MatchdayFinances _finances;
     private readonly MatchdayFans _fans;
+    private readonly IAdvisoryLock _locks;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
 
@@ -89,6 +97,7 @@ public sealed class PublishMatchday
         MatchdayNotifications notifications,
         MatchdayFinances finances,
         MatchdayFans fans,
+        IAdvisoryLock locks,
         IUnitOfWork unitOfWork,
         IClock clock)
     {
@@ -98,6 +107,7 @@ public sealed class PublishMatchday
         _notifications = notifications;
         _finances = finances;
         _fans = fans;
+        _locks = locks;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -109,6 +119,10 @@ public sealed class PublishMatchday
         Guid matchdayId,
         CancellationToken cancellationToken)
     {
+        // Every publication takes its turn before it reads anything, so what it reads is what the previous one committed, and a redelivered
+        // job that waited behind the first finds its round already published.
+        await using var turn = await _locks.HoldAsync(AdvisoryLockKey.MatchdayPublication(), cancellationToken);
+
         var workload = await _matchdays.LoadMatchdayAsync(matchdayId, cancellationToken);
 
         if (workload is null)

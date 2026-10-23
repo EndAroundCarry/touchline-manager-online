@@ -9,6 +9,7 @@ using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Contracts.World;
 using Tactical11Manager.Domain.Auth;
 using Tactical11Manager.Domain.Comms;
+using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.World;
 
 namespace Tactical11Manager.Application.World;
@@ -40,13 +41,13 @@ public enum ClaimClubOutcome
     /// <summary>The club does not exist.</summary>
     ClubNotFound = 7,
 
-    /// <summary>The club is not in the country's lowest active tier, or is not active (`WORLD-8`).</summary>
+    /// <summary>The club is not in an active division of its country, or is not active (`WORLD-8`).</summary>
     ClubNotClaimable = 8,
 
     /// <summary>Another manager already holds this club (master plan §7.6).</summary>
     ClubAlreadyClaimed = 9,
 
-    /// <summary>Every club in the country's lowest tier is held and the next tier is being generated (`PYR-10`).</summary>
+    /// <summary>Every club in the country's active tiers is held and the next tier is being generated (`PYR-10`).</summary>
     CapacityProvisioning = 10,
 
     /// <summary>The idempotency key was already used for a different claim.</summary>
@@ -65,7 +66,7 @@ public sealed record ClaimClubResult(
     DateTimeOffset? CooldownUntil);
 
 /// <summary>
-/// Takes over an AI-controlled club in a country's lowest active tier (master plan §7.6, `WORLD-8`).
+/// Takes over an AI-controlled club in any of a country's active tiers (master plan §7.6, `WORLD-8`).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -221,7 +222,7 @@ public sealed class ClaimClub
             world.CurrentSeasonNumber,
             cancellationToken);
 
-        if (placement is null || !await IsInLowestActiveTierAsync(club, placement, cancellationToken))
+        if (placement is null || !IsInActiveDivision(club, placement))
         {
             return Refused(ClaimClubOutcome.ClubNotClaimable);
         }
@@ -290,9 +291,9 @@ public sealed class ClaimClub
             return Refused(ClaimClubOutcome.ClubNotClaimable);
         }
 
-        if (capacity.ClubsInLowestTier > 0 && capacity.HumanOccupiedClubs >= capacity.ClubsInLowestTier)
+        if (capacity.ClubsInCountry > 0 && capacity.HumanOccupiedClubs >= capacity.ClubsInCountry)
         {
-            // PYR-2: the tier is full, so the country's answer is a new tier rather than a refusal with no
+            // PYR-2: the country is full, so the answer is a new tier rather than a refusal with no
             // way forward. PYR-10 requires the request's state to come back with the response.
             var provisioning = await _capacity.EnsureNextTierRequestedAsync(club.CountryId, cancellationToken);
 
@@ -423,20 +424,11 @@ public sealed class ClaimClub
             null);
     }
 
-    private async Task<bool> IsInLowestActiveTierAsync(
-        Club club,
-        ClubDashboardSnapshot placement,
-        CancellationToken cancellationToken)
-    {
-        if (club.Status != ClubStatus.Active || placement.Division.CountryId != club.CountryId)
-        {
-            return false;
-        }
-
-        var lowest = await _world.FindLowestActiveDivisionAsync(club.CountryId, cancellationToken);
-
-        return lowest is not null && lowest.Id == placement.Division.Id;
-    }
+    // A tier still being provisioned is not claimable until it is active (PYR-8); any active tier is (WORLD-8).
+    private static bool IsInActiveDivision(Club club, ClubDashboardSnapshot placement) =>
+        club.Status == ClubStatus.Active
+        && placement.Division.CountryId == club.CountryId
+        && placement.Division.Status == DivisionStatus.Active;
 
     private void Record(string action, Guid userId, string targetType, Guid targetId, string? reason) =>
         _audit.Record(new AuditEntry(

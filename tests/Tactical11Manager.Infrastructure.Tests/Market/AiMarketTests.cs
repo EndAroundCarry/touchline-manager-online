@@ -42,6 +42,18 @@ public sealed class AiMarketTests : IAsyncLifetime, IDisposable
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
 
         await db.Database.ExecuteSqlRawAsync("update finance.sponsor_deals set fixed_matchday_minor = fixed_matchday_minor + 100000000000");
+
+        // Seeded squads are fair templates (plan cheeky-dongarra): every club holds the same ratings, so no listing improves on what another club
+        // already has and the market would never find a first buyer. A third of the players are made a little better, which is what a season of
+        // training and ageing does to a real world, and the upgrade clause (TRF-12) has something to weigh.
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            update squad.player_attributes
+            set finishing = least(20, finishing + 4), passing = least(20, passing + 4), tackling = least(20, tackling + 4),
+                pace = least(20, pace + 4), stamina = least(20, stamina + 4), strength = least(20, strength + 4),
+                decisions = least(20, decisions + 4), vision = least(20, vision + 4)
+            where abs(hashtext(player_id::text)) % 3 = 0
+            """);
     }
 
     /// <summary>Stops and removes the world.</summary>

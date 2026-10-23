@@ -17,7 +17,7 @@ public sealed class CountryCapacityTests
 
         capacity.AvailableClubs.Should().Be(18);
         capacity.HasAvailableClubs.Should().BeTrue();
-        capacity.LowestTierIsFull.Should().BeFalse();
+        capacity.CountryIsFull.Should().BeFalse();
         capacity.NeedsExpansion.Should().BeFalse();
     }
 
@@ -28,7 +28,7 @@ public sealed class CountryCapacityTests
 
         capacity.AvailableClubs.Should().Be(7);
         capacity.HasAvailableClubs.Should().BeTrue();
-        capacity.LowestTierIsFull.Should().BeFalse();
+        capacity.CountryIsFull.Should().BeFalse();
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public sealed class CountryCapacityTests
 
         capacity.AvailableClubs.Should().Be(0);
         capacity.HasAvailableClubs.Should().BeFalse();
-        capacity.LowestTierIsFull.Should().BeTrue();
+        capacity.CountryIsFull.Should().BeTrue();
         capacity.NeedsExpansion.Should().BeTrue();
     }
 
@@ -57,7 +57,7 @@ public sealed class CountryCapacityTests
         // Guards the division-by-nothing case: a tier with no clubs must not trigger expansion.
         var capacity = CountryCapacity.Measure(CountryId, 1, Guid.CreateVersion7(), 0, 0);
 
-        capacity.LowestTierIsFull.Should().BeFalse();
+        capacity.CountryIsFull.Should().BeFalse();
         capacity.HasAvailableClubs.Should().BeFalse();
     }
 

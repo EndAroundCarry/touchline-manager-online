@@ -148,7 +148,7 @@ public sealed class SeasonRolloverWorkerTests : IAsyncLifetime
             .Select(divisionSeason => divisionSeason.Id)
             .ToListAsync();
 
-        nextDivisionSeasons.Should().HaveCount(6, "one per seeded country");
+        nextDivisionSeasons.Should().HaveCount(6 * WorldRuleSet.SeededTiers, "one per seeded tier of each country");
 
         foreach (var divisionSeasonId in nextDivisionSeasons)
         {

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.World;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Finance;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.Squad.Generation;
@@ -25,6 +26,9 @@ namespace Tactical11Manager.Infrastructure.Tests.World;
 [Collection(WorldCollection.Name)]
 public sealed class WorldSeedingTests : WorldTestBase
 {
+    /// <summary>Every country opens with tiers 1 and 2 (`WORLD-5`).</summary>
+    private const int ClubsInWorld = 6 * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
+
     /// <summary>Initializes the tests.</summary>
     public WorldSeedingTests(WorldFixture fixture)
         : base(fixture)
@@ -32,7 +36,7 @@ public sealed class WorldSeedingTests : WorldTestBase
     }
 
     [Fact]
-    public async Task The_world_holds_six_countries_with_one_full_tier_each()
+    public async Task The_world_holds_six_countries_with_two_full_tiers_each()
     {
         await using var scope = Fixture.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
@@ -46,14 +50,15 @@ public sealed class WorldSeedingTests : WorldTestBase
             .Where(division => countries.Select(country => country.Id).Contains(division.CountryId))
             .ToListAsync();
 
-        divisions.Should().HaveCount(6).And.OnlyContain(division => division.TierNumber == 1);
+        divisions.Should().HaveCount(6 * WorldRuleSet.SeededTiers);
+        divisions.Select(division => division.TierNumber).Distinct().Should().BeEquivalentTo([1, 2]);
         divisions.Should().OnlyContain(
             division => division.Status == DivisionStatus.Active,
             "a seeded tier is claimable immediately, unlike a provisioned one (PYR-8)");
 
         var clubs = await db.Clubs.Where(club => club.WorldId == Fixture.WorldId).ToListAsync();
 
-        clubs.Should().HaveCount(6 * WorldRuleSet.ClubsPerDivision, "six countries times a division of clubs");
+        clubs.Should().HaveCount(ClubsInWorld, "six countries times two divisions of clubs");
         clubs.Select(club => club.NormalizedName).Should().OnlyHaveUniqueItems();
         clubs.Select(club => club.Slug).Should().OnlyHaveUniqueItems();
         clubs.Should().OnlyContain(club => club.Reputation >= 1 && club.Reputation <= 100);
@@ -75,18 +80,32 @@ public sealed class WorldSeedingTests : WorldTestBase
             .Where(account => clubIds.Contains(account.ClubId))
             .ToListAsync();
 
-        accounts.Should().HaveCount(6 * WorldRuleSet.ClubsPerDivision);
-        accounts.Should().OnlyContain(account => account.CashMinor == WorldRuleSet.OpeningCashMinorTier1);
-        accounts.Should().OnlyContain(account => account.ReservedMinor == 0);
-        accounts.Should().OnlyContain(
-            account => account.LastLedgerSequence == 1,
+        accounts.Should().HaveCount(ClubsInWorld);
+
+        // Other suites in the collection play and claim in the shared world, so the balance is only still the opening one for an account
+        // nothing has been posted to since; the opening entry itself is what seeding wrote.
+        var untouched = accounts.Where(account => account.LastLedgerSequence == 1).ToList();
+
+        untouched.Should().OnlyContain(
+            account => account.CashMinor == WorldRuleSet.OpeningCashMinorTier1
+                || account.CashMinor == WorldRuleSet.OpeningCashMinorForTier(2),
             "the balance is one opening ledger entry, not a value written onto the row (FIN-18)");
+        untouched.Should().OnlyContain(account => account.ReservedMinor == 0);
+
+        var openings = await db.LedgerEntries
+            .Where(entry => entry.Category == LedgerCategory.OpeningBalance && clubIds.Contains(entry.ClubId))
+            .ToListAsync();
+
+        openings.Should().HaveCount(ClubsInWorld, "each account is opened by one entry");
+        openings.Should().OnlyContain(
+            entry => entry.ResultingCashMinor == WorldRuleSet.OpeningCashMinorTier1
+                || entry.ResultingCashMinor == WorldRuleSet.OpeningCashMinorForTier(2));
 
         var entries = await db.ClubSeasonEntries
             .Where(entry => clubIds.Contains(entry.ClubId))
             .ToListAsync();
 
-        entries.Should().HaveCount(6 * WorldRuleSet.ClubsPerDivision);
+        entries.Should().HaveCount(ClubsInWorld);
         entries.Should().OnlyContain(entry => entry.InitialControlType == ClubControlType.Ai);
         entries.Select(entry => entry.ClubId).Should().OnlyHaveUniqueItems(
             "one club appears once in a season, which the database also enforces");
@@ -107,7 +126,7 @@ public sealed class WorldSeedingTests : WorldTestBase
             .Where(building => clubIds.Contains(building.ClubId))
             .ToListAsync();
 
-        buildings.Should().HaveCount(2 * 6 * WorldRuleSet.ClubsPerDivision, "two buildings for each club (STRC-1)");
+        buildings.Should().HaveCount(2 * ClubsInWorld, "two buildings for each club (STRC-1)");
         buildings.Should().OnlyContain(building => building.Level == 1 && !building.IsBuilding);
 
         foreach (var kind in StructureKinds.All)
@@ -133,8 +152,9 @@ public sealed class WorldSeedingTests : WorldTestBase
                 .Select(club => club.Name)
                 .ToListAsync();
 
-            var regenerated = ClubIdentityGenerator
-                .GenerateDivision(WorldFixture.Seed, country.NamePoolKey, country.Code, tierNumber: 1, WorldRuleSet.ClubsPerDivision)
+            var regenerated = Enumerable.Range(1, WorldRuleSet.SeededTiers)
+                .SelectMany(tierNumber => ClubIdentityGenerator.GenerateDivision(
+                    WorldFixture.Seed, country.NamePoolKey, country.Code, tierNumber, WorldRuleSet.ClubsPerDivision))
                 .Select(identity => identity.Name)
                 .Order(StringComparer.Ordinal)
                 .ToList();
@@ -184,7 +204,7 @@ public sealed class WorldSeedingTests : WorldTestBase
     }
 
     [Fact]
-    public async Task A_seeded_tier_offers_every_club_to_a_new_manager()
+    public async Task The_seeded_tiers_offer_every_club_to_a_new_manager()
     {
         await using var scope = Fixture.CreateScope();
         var queries = scope.ServiceProvider.GetRequiredService<IOnboardingQueries>();
@@ -194,14 +214,17 @@ public sealed class WorldSeedingTests : WorldTestBase
             var capacity = await queries.GetCountryCapacityAsync(country.Id, CancellationToken.None);
 
             capacity.Should().NotBeNull();
-            capacity!.LowestActiveTier.Should().Be(1);
-            capacity.ClubsInLowestTier.Should().Be(WorldRuleSet.ClubsPerDivision);
-            capacity.HumanOccupiedClubs.Should().Be(0, "every club starts under AI control (WORLD-5)");
+            capacity!.LowestActiveTier.Should().Be(WorldRuleSet.SeededTiers);
+            capacity.ClubsInCountry.Should().Be(WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision);
 
-            var clubs = await queries.GetAvailableClubsAsync(capacity.DivisionSeasonId, CancellationToken.None);
+            var clubs = await queries.GetCountryClubsAsync(country.Id, CancellationToken.None);
 
-            clubs.Should().HaveCount(WorldRuleSet.ClubsPerDivision);
-            clubs.Should().OnlyContain(club => club.IsAvailable);
+            clubs.Should().HaveCount(WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision);
+            clubs.Count(club => club.IsAvailable).Should().Be(
+                capacity.ClubsInCountry - capacity.HumanOccupiedClubs,
+                "every club is the AI's (WORLD-5) unless a test sharing the world has claimed it");
+            clubs.Select(club => club.TierNumber).Should().BeInAscendingOrder("tier 1 is listed first");
+            clubs.Select(club => club.TierNumber).Distinct().Should().BeEquivalentTo([1, 2]);
         }
     }
 
@@ -244,9 +267,9 @@ public sealed class WorldSeedingTests : WorldTestBase
             WorldBootstrapGenerator.Version,
             "the bootstrap produces clubs and players, so the run records the version that covers both (FIC-8)");
         run.CountriesCreated.Should().Be(6);
-        run.ClubsCreated.Should().Be(6 * WorldRuleSet.ClubsPerDivision);
-        run.PlayersCreated.Should().Be(6 * WorldRuleSet.ClubsPerDivision * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
-        run.AccountsCreated.Should().Be(6 * WorldRuleSet.ClubsPerDivision);
+        run.ClubsCreated.Should().Be(ClubsInWorld);
+        run.PlayersCreated.Should().Be(ClubsInWorld * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
+        run.AccountsCreated.Should().Be(ClubsInWorld);
         run.InputHash.Should().HaveLength(64);
         run.CompletedAt.Should().NotBeNull();
     }
@@ -263,7 +286,7 @@ public sealed class WorldSeedingTests : WorldTestBase
             .Select(group => new { ClubId = group.Key, Count = group.Count() })
             .ToListAsync();
 
-        squadSizes.Should().HaveCount(6 * WorldRuleSet.ClubsPerDivision);
+        squadSizes.Should().HaveCount(ClubsInWorld);
         squadSizes.Should().OnlyContain(club => club.Count == WorldRuleSet.GeneratorSquadTarget, "SQ-1");
     }
 
@@ -286,7 +309,7 @@ public sealed class WorldSeedingTests : WorldTestBase
 
         var byClub = wide.GroupBy(entry => entry.ClubId).ToList();
 
-        byClub.Should().HaveCount(6 * WorldRuleSet.ClubsPerDivision, "every club has wide midfielders");
+        byClub.Should().HaveCount(ClubsInWorld, "every club has wide midfielders");
         byClub.Should().OnlyContain(
             club => club.Count(entry => entry.PrimaryPosition == PlayerPosition.LeftMidfielder) == 1
                 && club.Count(entry => entry.PrimaryPosition == PlayerPosition.RightMidfielder) == 1,
@@ -327,7 +350,7 @@ public sealed class WorldSeedingTests : WorldTestBase
 
         var playerCount = await db.Players.CountAsync(player => player.WorldId == Fixture.WorldId);
 
-        playerCount.Should().Be(6 * WorldRuleSet.ClubsPerDivision * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
+        playerCount.Should().Be(ClubsInWorld * WorldRuleSet.GeneratorSquadTarget, "SQ-1");
 
         (await db.PlayerAttributes.CountAsync()).Should().Be(playerCount);
         (await db.PlayerStates.CountAsync()).Should().Be(playerCount);
@@ -347,8 +370,10 @@ public sealed class WorldSeedingTests : WorldTestBase
         states.Should().OnlyContain(row => row.AttributeProgress.All(progress => progress == 0), "TRN-10");
     }
 
-    [Fact]
-    public async Task Every_seeded_squad_is_exactly_what_the_generator_produces()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Every_seeded_squad_is_exactly_what_the_generator_produces(int tier)
     {
         // The reproducibility contract for players (FIC-7, PYR-14): re-running the generator with the
         // recorded ordinal must reproduce the names and attributes that are in the database.
@@ -359,11 +384,11 @@ public sealed class WorldSeedingTests : WorldTestBase
         var season = await db.Seasons.SingleAsync(candidate => candidate.WorldId == Fixture.WorldId);
 
         var identities = ClubIdentityGenerator.GenerateDivision(
-            WorldFixture.Seed, country.NamePoolKey, country.Code, tierNumber: 1, WorldRuleSet.ClubsPerDivision);
+            WorldFixture.Seed, country.NamePoolKey, country.Code, tier, WorldRuleSet.ClubsPerDivision);
 
-        const int ordinal = 3;
+        const int position = 3;
         var clubId = await db.Clubs
-            .Where(club => club.CountryId == country.Id && club.Name == identities[ordinal].Name)
+            .Where(club => club.CountryId == country.Id && club.Name == identities[position].Name)
             .Select(club => club.Id)
             .SingleAsync();
 
@@ -382,14 +407,14 @@ public sealed class WorldSeedingTests : WorldTestBase
             .ToListAsync();
 
         var regenerated = PlayerGenerator
-            .GenerateSquad(new SquadGenerationRequest(
+            .GenerateTemplateSquad(new SquadGenerationRequest(
                 WorldFixture.Seed,
                 country.NamePoolKey,
                 country.Code,
                 Fixture.WorldId,
                 clubId,
-                ordinal,
-                Tier: 1,
+                ((tier - 1) * WorldRuleSet.ClubsPerDivision) + position,
+                tier,
                 season.Id,
                 season.SequenceNumber,
                 season.GameYear,

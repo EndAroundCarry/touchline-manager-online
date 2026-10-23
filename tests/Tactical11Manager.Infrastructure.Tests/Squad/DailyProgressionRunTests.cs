@@ -41,8 +41,8 @@ public sealed class DailyProgressionRunTests
     {
         var day = new DateOnly(2026, 9, 25);
 
-        // Six countries, one tier each, a division of clubs apiece, the target squad apiece (WORLD-4, SQ-1).
-        const int clubs = 6 * WorldRuleSet.ClubsPerDivision;
+        // Six countries, two tiers each, a division of clubs apiece, the target squad apiece (WORLD-4, WORLD-5, SQ-1).
+        const int clubs = 6 * WorldRuleSet.SeededTiers * WorldRuleSet.ClubsPerDivision;
         const int players = clubs * WorldRuleSet.GeneratorSquadTarget;
 
         await using (var scope = _fixture.CreateScope())

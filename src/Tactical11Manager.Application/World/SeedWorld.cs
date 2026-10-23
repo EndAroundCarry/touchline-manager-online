@@ -162,23 +162,27 @@ public sealed partial class SeedWorld
 
             _world.AddCountry(country);
 
-            // The one generation path, shared with the provisioning worker. Tier 1 is claimable the moment
-            // it exists; a provisioned tier stays in provisioning until its backfill completes (PYR-8).
-            var tier = _generator.BuildTier(
-                new TierGenerationRequest(
-                    Seed: seed,
-                    WorldSeed: seed,
-                    Country: country,
-                    Tier: 1,
-                    Season: season,
-                    Activate: true,
-                    BootstrapCutoff: null),
-                now);
+            // The one generation path, shared with the provisioning worker. The seeded tiers are claimable the
+            // moment they exist; a provisioned tier stays in provisioning until its backfill completes (PYR-8).
+            for (var tierNumber = 1; tierNumber <= WorldRuleSet.SeededTiers; tierNumber++)
+            {
+                var tier = _generator.BuildTier(
+                    new TierGenerationRequest(
+                        Seed: seed,
+                        WorldSeed: seed,
+                        Country: country,
+                        Tier: tierNumber,
+                        Season: season,
+                        Activate: true,
+                        BootstrapCutoff: null),
+                    now);
+
+                clubsCreated += tier.Clubs;
+                playersCreated += tier.Players;
+                accountsCreated += tier.Accounts;
+            }
 
             countries++;
-            clubsCreated += tier.Clubs;
-            playersCreated += tier.Players;
-            accountsCreated += tier.Accounts;
         }
 
         run.Succeed(new GenerationRunCounts(countries, clubsCreated, playersCreated, accountsCreated), now);
@@ -222,6 +226,7 @@ public sealed partial class SeedWorld
             RoundRobinSchedule.Version,
             WorldRuleSet.Version,
             WorldRuleSet.ClubsPerDivision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            WorldRuleSet.SeededTiers.ToString(System.Globalization.CultureInfo.InvariantCulture),
             WorldRuleSet.GeneratorSquadTarget.ToString(System.Globalization.CultureInfo.InvariantCulture),
             WorldRuleSet.GeneratedGoalkeepers.ToString(System.Globalization.CultureInfo.InvariantCulture),
             WorldRuleSet.GeneratedDefenders.ToString(System.Globalization.CultureInfo.InvariantCulture),

@@ -313,22 +313,16 @@ public sealed class EconomyPersistenceTests
 
         tiers.Should().NotBeEmpty();
 
-        var inside = 0;
-
         foreach (var club in tiers)
         {
-            var distance = EconomyRuleSet.WageBandDistanceMinor(
-                club.TierNumber,
-                wages[club.ClubId],
-                EconomyRuleSet.SeededWageBandLowBp,
-                EconomyRuleSet.SeededWageBandHighBp);
+            // The squads are fair templates (plan cheeky-dongarra), not sized into the 70-92% band, so their bills follow their ratings and sit
+            // below it; what is still owed is that no club opens with a squad it cannot carry (FIN-2).
             var forecast = EconomyRuleSet.FreshClubForecastMinor(club.TierNumber);
 
-            inside += distance == 0 ? 1 : 0;
-            distance.Should().BeLessThan(forecast / 5, "no club opens with a squad far from what it can carry (FIN-2)");
+            wages[club.ClubId].Should().BeLessThanOrEqualTo(
+                forecast * EconomyRuleSet.SeededWageBandHighBp / 10_000,
+                "no club opens with a squad it cannot carry (FIN-2)");
         }
-
-        inside.Should().BeGreaterThanOrEqualTo(tiers.Count * 3 / 4, "forty draws find a squad inside the band for most clubs");
     }
 
     /// <summary>

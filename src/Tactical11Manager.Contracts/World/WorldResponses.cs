@@ -54,16 +54,16 @@ public sealed record CountrySummaryResponse(
     int SortOrder);
 
 /// <summary>
-/// How full a country's pyramid is, measured at its lowest active tier (`WORLD-8`, `PYR-1`).
+/// How full a country's pyramid is, measured across its active tiers (`WORLD-8`, `PYR-1`).
 /// </summary>
 /// <param name="CountryId">The country being measured.</param>
-/// <param name="LowestActiveTier">The tier a new manager may join.</param>
+/// <param name="LowestActiveTier">The country's lowest active tier, which the pyramid grows below.</param>
 /// <param name="LowestActiveTierDivisionId">The division row for that tier.</param>
 /// <param name="LowestActiveTierName">The generated name of that tier.</param>
-/// <param name="ClubsInLowestTier">How many clubs the tier holds.</param>
+/// <param name="ClubsInCountry">How many clubs the active tiers hold.</param>
 /// <param name="HumanOccupiedClubs">How many hold an open human tenure, including inactive ones (`OCC-8`).</param>
 /// <param name="AvailableClubs">How many clubs a manager could take over right now.</param>
-/// <param name="LowestTierIsFull">Whether every club is held by a human.</param>
+/// <param name="CountryIsFull">Whether every club of every active tier is held by a human.</param>
 /// <param name="TargetTierForExpansion">The tier that would be created if the pyramid grows (`PYR-11`).</param>
 /// <param name="Provisioning">The state of the next tier's generation, when one is under way.</param>
 /// <param name="ServerTime">The server's current instant.</param>
@@ -72,10 +72,10 @@ public sealed record CountryCapacityResponse(
     int LowestActiveTier,
     Guid LowestActiveTierDivisionId,
     string LowestActiveTierName,
-    int ClubsInLowestTier,
+    int ClubsInCountry,
     int HumanOccupiedClubs,
     int AvailableClubs,
-    bool LowestTierIsFull,
+    bool CountryIsFull,
     int TargetTierForExpansion,
     ProvisioningStatusResponse? Provisioning,
     DateTimeOffset ServerTime);
@@ -103,12 +103,12 @@ public sealed record ProvisioningStatusResponse(
     DateTimeOffset? CompletedAt,
     int PollAfterSeconds);
 
-/// <summary>The clubs a manager may take over in a country's lowest active tier.</summary>
+/// <summary>The clubs a manager may take over in any of a country's active tiers.</summary>
 /// <param name="CountryId">The country.</param>
 /// <param name="DivisionId">The lowest active tier's division.</param>
-/// <param name="DivisionName">The tier's generated name.</param>
-/// <param name="TierNumber">The tier number.</param>
-/// <param name="Clubs">The clubs, in a stable order. Availability is per club.</param>
+/// <param name="DivisionName">The lowest active tier's generated name.</param>
+/// <param name="TierNumber">The lowest active tier number.</param>
+/// <param name="Clubs">The clubs, by tier and then name. Each carries its own tier, and availability is per club.</param>
 /// <param name="ServerTime">The server's current instant.</param>
 public sealed record AvailableClubsResponse(
     Guid CountryId,
@@ -126,6 +126,8 @@ public sealed record AvailableClubsResponse(
 /// <param name="Region">The generated region.</param>
 /// <param name="BadgeSeed">The seed a procedurally drawn badge is derived from. No real mark is involved.</param>
 /// <param name="Reputation">The club's reputation, on the 1–100 scale.</param>
+/// <param name="TierNumber">The tier the club plays in.</param>
+/// <param name="DivisionName">The generated name of that tier.</param>
 /// <param name="IsAvailable">Whether the club is currently AI-controlled and claimable.</param>
 public sealed record AvailableClubResponse(
     Guid Id,
@@ -135,6 +137,8 @@ public sealed record AvailableClubResponse(
     string Region,
     string BadgeSeed,
     int Reputation,
+    int TierNumber,
+    string DivisionName,
     bool IsAvailable);
 
 /// <summary>A manager profile (master plan §10.2).</summary>

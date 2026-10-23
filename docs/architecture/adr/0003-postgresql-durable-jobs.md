@@ -1,6 +1,7 @@
 # ADR-0003: PostgreSQL-backed durable job queue
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0086](0086-matchday-publications-take-turns.md): the worker reruns a job that failed with a serialization failure or a deadlock up to five times within the same attempt, in a fresh scope, before the failure counts against the job.
 - **Date:** 2026-09-23
 - **Stage:** 0 (implemented in Stage 1 minimal, Stage 6 full)
 - **Related:** [ADR-0001](0001-modular-monolith.md), [ADR-0008](0008-deployment-topology.md)

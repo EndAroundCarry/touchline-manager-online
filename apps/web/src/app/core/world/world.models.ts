@@ -51,16 +51,16 @@ export interface ProvisioningStatus {
   readonly pollAfterSeconds: number;
 }
 
-/** How full a country's pyramid is, measured at its lowest active tier. */
+/** How full a country's pyramid is, measured across its active tiers. */
 export interface CountryCapacity {
   readonly countryId: string;
   readonly lowestActiveTier: number;
   readonly lowestActiveTierDivisionId: string;
   readonly lowestActiveTierName: string;
-  readonly clubsInLowestTier: number;
+  readonly clubsInCountry: number;
   readonly humanOccupiedClubs: number;
   readonly availableClubs: number;
-  readonly lowestTierIsFull: boolean;
+  readonly countryIsFull: boolean;
   readonly targetTierForExpansion: number;
   readonly provisioning: ProvisioningStatus | null;
   readonly serverTime: string;
@@ -75,10 +75,12 @@ export interface AvailableClub {
   readonly region: string;
   readonly badgeSeed: string;
   readonly reputation: number;
+  readonly tierNumber: number;
+  readonly divisionName: string;
   readonly isAvailable: boolean;
 }
 
-/** The clubs of a country's lowest active tier. */
+/** The clubs of a country's active tiers, by tier. */
 export interface AvailableClubs {
   readonly countryId: string;
   readonly divisionId: string;

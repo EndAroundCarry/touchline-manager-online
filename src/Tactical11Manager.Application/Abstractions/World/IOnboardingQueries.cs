@@ -66,6 +66,18 @@ public readonly record struct AdvisoryLockKey(string Scope, Guid Target)
     /// </remarks>
     public static AdvisoryLockKey SeasonRollover(Guid worldId) => new("season-rollover", worldId);
 
+    /// <summary>
+    /// The lock every matchday publication takes its turn behind.
+    /// </summary>
+    /// <remarks>
+    /// Publications are serializable (`CONC-2`), and two of them for different divisions still collide: the accounts, tables, fan bases and
+    /// player states of a whole world sit on a few pages, and PostgreSQL's serializable checks lock pages and whole small tables, not rows. A
+    /// dozen divisions publishing at one kickoff therefore kept rolling each other back. Taking turns collides with nobody. One key for the
+    /// deployment, because a deployment holds one world (`WORLD-1`) and the publication takes its turn before it has read which world its
+    /// matchday is in.
+    /// </remarks>
+    public static AdvisoryLockKey MatchdayPublication() => new("matchday-publication", Guid.Empty);
+
     /// <summary>Renders the lock for diagnostics. Never contains anything sensitive.</summary>
     public override string ToString() => $"{Scope}:{Target}";
 }
@@ -93,15 +105,27 @@ public interface IAdvisoryLock
     /// <param name="key">The lock to take.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task AcquireAsync(AdvisoryLockKey key, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Blocks until the unit of work holds the lock, before any transaction has begun, and holds it until the returned handle is disposed.
+    /// </summary>
+    /// <remarks>
+    /// For a serializable transaction, which takes its snapshot at its first statement: a lock taken inside one would be waited for on a
+    /// snapshot from before the wait, and the transaction would read the state the lock was meant to keep it from (ADR-0010). Taken first, the
+    /// transaction that follows starts after the previous holder has committed.
+    /// </remarks>
+    /// <param name="key">The lock to take.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IAsyncDisposable> HoldAsync(AdvisoryLockKey key, CancellationToken cancellationToken);
 }
 
 /// <summary>How full a country's pyramid is, as measured from the database (`WORLD-8`, `PYR-1`).</summary>
 /// <param name="CountryId">The country.</param>
-/// <param name="LowestActiveTier">The tier a new manager may join.</param>
+/// <param name="LowestActiveTier">The country's lowest active tier, which the pyramid grows below.</param>
 /// <param name="DivisionId">That tier's division row.</param>
-/// <param name="DivisionSeasonId">That tier's instance in the current season, which is what membership is measured against.</param>
+/// <param name="DivisionSeasonId">That tier's instance in the current season.</param>
 /// <param name="DivisionName">That tier's generated name.</param>
-/// <param name="ClubsInLowestTier">How many clubs the tier holds.</param>
+/// <param name="ClubsInCountry">How many clubs the country's active tiers hold in the current season.</param>
 /// <param name="HumanOccupiedClubs">
 /// How many hold an open human tenure. Inactive tenures count (`OCC-8`); suspended accounts do not.
 /// </param>
@@ -111,10 +135,10 @@ public sealed record CountryCapacitySnapshot(
     Guid DivisionId,
     Guid DivisionSeasonId,
     string DivisionName,
-    int ClubsInLowestTier,
+    int ClubsInCountry,
     int HumanOccupiedClubs);
 
-/// <summary>One club in a country's lowest active tier, as offered to a manager.</summary>
+/// <summary>One club in a country's active tiers, as offered to a manager.</summary>
 /// <param name="Id">The club identity.</param>
 /// <param name="Name">The generated name.</param>
 /// <param name="ShortName">The abbreviation.</param>
@@ -122,6 +146,8 @@ public sealed record CountryCapacitySnapshot(
 /// <param name="Region">The generated region.</param>
 /// <param name="BadgeSeed">The badge seed.</param>
 /// <param name="Reputation">The club's reputation.</param>
+/// <param name="TierNumber">The tier the club plays in.</param>
+/// <param name="DivisionName">The generated name of that tier.</param>
 /// <param name="IsAvailable">Whether the club is AI-controlled and therefore claimable.</param>
 public sealed record AvailableClubRow(
     Guid Id,
@@ -131,6 +157,8 @@ public sealed record AvailableClubRow(
     string Region,
     string BadgeSeed,
     int Reputation,
+    int TierNumber,
+    string DivisionName,
     bool IsAvailable);
 
 /// <summary>Everything the inherited-club dashboard reads (`WORLD-9`).</summary>
@@ -178,12 +206,17 @@ public sealed record ClubTenureSnapshot(
 /// </remarks>
 public interface IOnboardingQueries
 {
-    /// <summary>Measures a country's lowest active tier, or returns null if it has no active division.</summary>
+    /// <summary>Measures a country's active tiers together, or returns null if it has no active division.</summary>
     Task<CountryCapacitySnapshot?> GetCountryCapacityAsync(Guid countryId, CancellationToken cancellationToken);
 
-    /// <summary>Lists the clubs of a division-season with their availability, in a stable order.</summary>
+    /// <summary>Lists the clubs of one division-season with their availability, in a stable order.</summary>
     Task<IReadOnlyList<AvailableClubRow>> GetAvailableClubsAsync(
         Guid divisionSeasonId,
+        CancellationToken cancellationToken);
+
+    /// <summary>Lists the clubs of every active tier of a country with their availability, by tier and then name.</summary>
+    Task<IReadOnlyList<AvailableClubRow>> GetCountryClubsAsync(
+        Guid countryId,
         CancellationToken cancellationToken);
 
     /// <summary>Reads everything the inherited-club dashboard shows, or returns null if the club is unknown.</summary>
