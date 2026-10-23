@@ -27,6 +27,17 @@ terrace or seats, how much of a stand is roofed, where the hospitality boxes are
 an ordered list of shapes, far to near. The camera is fixed, so the order is too: main stand and east end, then the pitch
 furniture, then west end and opposite stand. Whether a face shows is read from the camera, not written down.
 
+> **Amended (2026-10-22, ground of 15 levels):** the plan has fifteen levels. Levels 1 to 5 are open grounds as before.
+> From level 6 the ground is closed, as a real big ground is: every stand is roofed end to end, the roofs reach forward
+> over every row but the front two, and the roofs of the ends run on over the corners to meet the long stands' roofs, so
+> from above a manager sees one roof ring, the pitch and the front rows. A seat counts as covered only when the roof is
+> over it, so the front rows are open seats and the picture still draws every kind of place; the planes a manager can
+> light are drawn over the roofs, so seats a roof hides can still be found. A third tier of seats rises on one stand at
+> a time (main stand 12, east end 13, opposite stand 14, west end 15), with a second row of boxes on the main stand. The
+> camera and its frame are unchanged, because the structures pictures share them; the road and the trees were laid out
+> round the level-10 ground and stay where they were up to level 10, while a bigger ground moves the road out and fells
+> the trees in its way. The club's flag stands on the front edge of the main stand's roof.
+
 **3. Sectors, rows and seats are drawn.** A stand is cut into sectors by aisles. Every row is a tread (and a riser, when
 the camera sees it), and a seat is a dash on a stroked line, so a ground of thousands of seats is a few hundred elements:
 the biggest ground is 342 shapes. A terrace is drawn as steps with a standing crowd and crush barriers; the hospitality
