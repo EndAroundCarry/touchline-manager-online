@@ -31,6 +31,8 @@ namespace Tactical11Manager.Domain.Rules;
 /// upkeep live in <see cref="StructureRuleSet"/> (`STRC-*`).
 /// The economy rework moved the money rules (what a player is worth and paid, what a club earns, what a season pays) into
 /// <see cref="EconomyRuleSet"/>; the entries below that were tier-divided baselines now read from it.
+/// The fair squads milestone (plan cheeky-dongarra) made every seeded club of a tier open with the same mix of abilities
+/// (<see cref="Squad.Generation.SquadTemplate"/>) and tier 2 exist from the first season.
 /// Bumping <see cref="Version"/> is what makes that a rule change rather than a silent constant
 /// tweak (`RULE-3`); a world already stamped with an earlier version keeps being read against it.
 /// </para>
@@ -38,7 +40,7 @@ namespace Tactical11Manager.Domain.Rules;
 public static class WorldRuleSet
 {
     /// <summary>The rule-set version stamped onto every world and season created from it.</summary>
-    public const string Version = "world-rules-v18";
+    public const string Version = "world-rules-v19";
 
     /// <summary>Every active division holds exactly 16 clubs (`WORLD-4`). There is no other size.</summary>
     public const int ClubsPerDivision = 16;

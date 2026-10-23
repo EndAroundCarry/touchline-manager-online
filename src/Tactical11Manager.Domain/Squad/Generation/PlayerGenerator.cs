@@ -80,7 +80,7 @@ public static class PlayerGenerator
     /// and version must reproduce the same squads; the same seed and a different version must not be
     /// expected to.
     /// </remarks>
-    public const string Version = "player-gen-v3";
+    public const string Version = "player-gen-v4";
 
     /// <summary>How far each further draw of a sized squad moves the club ordinal, so it draws different players from the same seed.</summary>
     private const int SizingDrawStride = 1_000;
@@ -89,7 +89,7 @@ public static class PlayerGenerator
     /// The positional composition of a generated squad, ordered goalkeeper outwards. Its length is the
     /// squad target (`SQ-1`), and a test asserts the family counts match <see cref="WorldRuleSet"/>.
     /// </summary>
-    private static readonly PlayerPosition[] Composition =
+    internal static readonly PlayerPosition[] Composition =
     [
         PlayerPosition.Goalkeeper,
         PlayerPosition.Goalkeeper,
@@ -140,12 +140,7 @@ public static class PlayerGenerator
     /// <returns>The generated players, goalkeepers first, in composition order.</returns>
     public static IReadOnlyList<GeneratedSquadMember> GenerateSquad(SquadGenerationRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentException.ThrowIfNullOrWhiteSpace(request.Seed);
-        ArgumentException.ThrowIfNullOrWhiteSpace(request.CountryCode);
-        ArgumentOutOfRangeException.ThrowIfNegative(request.ClubOrdinalInCountry);
-        ArgumentOutOfRangeException.ThrowIfLessThan(request.Tier, 1);
-        ArgumentOutOfRangeException.ThrowIfLessThan(request.SeasonNumber, 1);
+        Validate(request);
 
         var pool = PlayerNamePools.For(request.NamePoolKey);
         var rng = new Pcg32(DeterministicDigest.SeedOf(
@@ -163,6 +158,56 @@ public static class PlayerGenerator
             drafts.Add(Draft(request, pool, rng, Composition[index], nameOrdinal));
         }
 
+        return BuildSquad(request, drafts);
+    }
+
+    /// <summary>
+    /// Generates a club's senior squad from the tier's fair template (plan cheeky-dongarra): every slot has a fixed rating, so every club of a
+    /// tier opens equally skilled apart from the small seeded diversity <see cref="SquadTemplate"/> adds.
+    /// </summary>
+    /// <param name="request">The generation inputs.</param>
+    /// <returns>
+    /// The generated players, goalkeepers first, in composition order. Each player's displayed ability is exactly his slot's rating, and the
+    /// squad has <see cref="SquadTemplate.GemsPerSquad"/> gem and <see cref="SquadTemplate.TalentsPerSquad"/> talents. Wages follow the
+    /// ratings and are fixed, so no wage-sizing draws are needed.
+    /// </returns>
+    public static IReadOnlyList<GeneratedSquadMember> GenerateTemplateSquad(SquadGenerationRequest request)
+    {
+        Validate(request);
+
+        var pool = PlayerNamePools.For(request.NamePoolKey);
+        var rng = new Pcg32(DeterministicDigest.SeedOf(
+            request.Seed,
+            request.CountryCode,
+            "squad",
+            request.ClubOrdinalInCountry.ToString(CultureInfo.InvariantCulture)));
+
+        var plan = SquadTemplate.PlanFor(request.Seed, request.CountryCode, request.ClubOrdinalInCountry, request.Tier);
+        var drafts = new List<SquadDraft>(plan.Count);
+
+        for (var index = 0; index < plan.Count; index++)
+        {
+            var nameOrdinal = (request.ClubOrdinalInCountry * WorldRuleSet.GeneratorSquadTarget) + index;
+            var slot = plan[index];
+
+            drafts.Add(Draft(request, pool, rng, slot.Position, nameOrdinal, new DraftOverride(slot.Age, slot.Potential, slot.Rating, LandOnRating: true)));
+        }
+
+        return BuildSquad(request, drafts);
+    }
+
+    private static void Validate(SquadGenerationRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.Seed);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.CountryCode);
+        ArgumentOutOfRangeException.ThrowIfNegative(request.ClubOrdinalInCountry);
+        ArgumentOutOfRangeException.ThrowIfLessThan(request.Tier, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(request.SeasonNumber, 1);
+    }
+
+    private static List<GeneratedSquadMember> BuildSquad(SquadGenerationRequest request, List<SquadDraft> drafts)
+    {
         var statuses = SquadStatuses(drafts);
         var squad = new List<GeneratedSquadMember>(drafts.Count);
 
@@ -316,7 +361,19 @@ public static class PlayerGenerator
             clubId.ToString("D"),
             replacementOrdinal.ToString(CultureInfo.InvariantCulture)) % 100_000);
 
-        var draft = Draft(request, pool, rng, position, nameOrdinal);
+        // The rating comes from the tier template's lowest values, so a repair never beats the squad's weakest slots.
+        var ageSpan = WorldRuleSet.PlayerMaximumAge - WorldRuleSet.PlayerMinimumAge + 1;
+        var age = WorldRuleSet.PlayerMinimumAge + ((rng.NextInt(ageSpan) + rng.NextInt(ageSpan)) / 2);
+        var ratings = SquadTemplate.ReplacementRatingsFor(tier);
+        var rating = ratings[rng.NextInt(ratings.Count)];
+
+        var draft = Draft(
+            request,
+            pool,
+            rng,
+            position,
+            nameOrdinal,
+            new DraftOverride(age, SquadTemplate.NormalPotential(rating, age), rating, LandOnRating: true));
         var playerId = Guid.CreateVersion7();
 
         return new GeneratedSquadMember(
@@ -496,6 +553,11 @@ public static class PlayerGenerator
         if (over is not null)
         {
             ShiftToAbility(values, over.TargetAbility);
+
+            if (over.LandOnRating)
+            {
+                LiftToRating(values, over.TargetAbility);
+            }
         }
 
         var attributes = PlayerAttributeSet.FromValues(values);
@@ -555,6 +617,28 @@ public static class PlayerGenerator
             for (var index = 0; index < values.Length; index++)
             {
                 values[index] = Math.Clamp(values[index] + delta, WorldRuleSet.AttributeMin, WorldRuleSet.AttributeMax);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Raises attributes by one, spread across the whole set, until the exact mean is no lower than the target. The rounded mean (the ability
+    /// shown) does not move, but the whole-number mean the AI lineup orders players by (`AiClubPolicy.ChooseLineup`) now equals the rating
+    /// instead of sometimes falling one short, so two players of different ratings never tie there.
+    /// </summary>
+    private static void LiftToRating(int[] values, int target)
+    {
+        var missing = (target * values.Length) - values.Sum();
+        const int stride = 5;
+
+        for (var step = 0; missing > 0 && step < values.Length * 2; step++)
+        {
+            var index = (step * stride) % values.Length;
+
+            if (values[index] < WorldRuleSet.AttributeMax)
+            {
+                values[index]++;
+                missing--;
             }
         }
     }
@@ -653,5 +737,9 @@ public static class PlayerGenerator
     /// The values a free agent fixes instead of drawing them the way a squad member does: his age, his
     /// hidden potential, and the ability he shows (the rounded mean of his attributes).
     /// </summary>
-    internal sealed record DraftOverride(int Age, int Potential, int TargetAbility);
+    /// <param name="Age">His age in game years.</param>
+    /// <param name="Potential">His hidden potential.</param>
+    /// <param name="TargetAbility">The ability he shows.</param>
+    /// <param name="LandOnRating">Whether his exact mean is also lifted to at least the rating, for the fair seeded squads.</param>
+    internal sealed record DraftOverride(int Age, int Potential, int TargetAbility, bool LandOnRating = false);
 }

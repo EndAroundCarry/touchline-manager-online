@@ -216,6 +216,7 @@ public sealed partial class SeedWorld
             ClubIdentityGenerator.Version,
             ClubNamePools.Version,
             PlayerGenerator.Version,
+            SquadTemplate.Version,
             PlayerNamePools.Version,
             PlayerAttributeProfiles.Version,
             RoundRobinSchedule.Version,
