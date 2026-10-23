@@ -224,7 +224,7 @@ curl -s -X POST $API/ops/diagnostics/resume-rollover \
 **A world seeded with 18-club divisions.** Under `world-rules-v18` a division holds 16 clubs and the rollover
 refuses a division of any other size (`RunSeasonRollover`), so an 18-club world fails its first rollover at
 preflight and no resume fixes it. Existing worlds are not migrated (`RULE-4`, ADR-0083): reseed from a fresh
-database (`npm run migrate`, `npm run seed`, six countries of 16 clubs).
+database (`npm run migrate`, `npm run seed`, nine countries of two tiers of 16 clubs, 288 clubs; ADR-0085).
 
 ## Runbook — hand a club to the AI
 
@@ -250,8 +250,8 @@ curl -s -X POST $API/admin/clubs/$CLUB_ID/assign-ai \
 ```
 
 **Validation.** The club's tenure is `closed` with `end_reason = administrator_closed`; the club is claimable
-again and the AI's daily pass (ADR-0018) will set its tactics and training. If the country's lowest tier was
-full of humans, this frees a place and can provision a new tier (`PYR-1`) — check
+again and the AI's daily pass (ADR-0018) will set its tactics and training. If every club in the country was
+held by a human, this frees a place and can provision a new tier (`PYR-1`) — check
 `GET /api/v1/countries/<id>/capacity` if that matters.
 
 **Notification.** The former manager is **not** emailed by this command; if they should be told, send that

@@ -276,7 +276,7 @@ in every other environment (see `.env.example`).
 A new database has no world in it, so create one before anyone can register a club:
 
 ```bash
-npm run seed          # six countries, one 18-club tier each, 24 players per club, funded accounts
+npm run seed          # nine countries, two 16-club tiers each (288 clubs), 24 players per club, funded accounts
 ```
 
 The seeder is idempotent, so running it again reports the world it already found and writes nothing.
@@ -310,7 +310,7 @@ curl -X POST http://localhost:5080/api/v1/club-claims \
   -d '{"clubId":"<from available-clubs>"}'
 ```
 
-A country whose lowest tier is full answers `409 CAPACITY_PROVISIONING` and queues the next tier's
+A country whose every club has a human manager answers `409 CAPACITY_PROVISIONING` and queues the next tier's
 generation. The worker then generates, backfills, validates, and activates that tier, so the country grows
 by the same generic path for every tier above the first. Why a takeover serialises the way it does is in
 [ADR-0010](docs/architecture/adr/0010-club-takeover-serialisation.md); how the tier is built is in

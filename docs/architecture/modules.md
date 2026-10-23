@@ -130,7 +130,7 @@ flowchart TD
 | 0 | — | This document set |
 | 1 | ops | Walking skeleton: one no-op durable job end to end |
 | 2 | auth | Full authentication lifecycle |
-| 3 | world, auth, competition (shell), finance (accounts) | Six countries, 96 clubs, atomic takeover |
+| 3 | world, auth, competition (shell), finance (accounts) | Nine countries, two tiers each, 288 clubs, atomic takeover (96 clubs and one tier before ADR-0085) |
 | 4 | squad | Legal 24-player squads, tactics, training, contracts |
 | 5 | match (engine only, no database) | Pure engine + benchmark lab |
 | 6 | competition, match, ops, comms | First server-authoritative playable slice |

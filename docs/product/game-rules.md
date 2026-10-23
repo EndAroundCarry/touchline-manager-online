@@ -33,15 +33,16 @@ Conventions used below:
 | Ref | Rule |
 |---|---|
 | WORLD-1 | Production runs exactly one persistent `GameWorld`. The schema must still carry or derive `world_id` so test and future shard worlds are possible. |
-| WORLD-2 | Launch countries: **England, Spain, Germany, Italy, France, Romania** (stable codes `ENG`, `ESP`, `GER`, `ITA`, `FRA`, `ROU`). |
+| WORLD-2 | Launch countries: **England, Spain, Germany, Italy, France, Romania, Belgium, Portugal, the Netherlands** (stable codes `ENG`, `ESP`, `GER`, `ITA`, `FRA`, `ROU`, `BEL`, `POR`, `NED`). Each has its own name pools and its own forum. See [ADR-0085](../architecture/adr/0085-fair-seeded-squads-and-two-tiers-from-the-first-season.md). |
 | WORLD-3 | All club, competition, and player identity is fictional. See [`content-and-fictional-data-policy.md`](content-and-fictional-data-policy.md). |
 | WORLD-4 | Every active division has **exactly 16 clubs**. There is no other size in the MVP. A world seeded when divisions held 18 clubs is not migrated (`RULE-4`) and cannot roll over under `world-rules-v18`; it is reseeded. See [ADR-0083](../architecture/adr/0083-sixteen-clubs-and-thirty-matchdays.md). |
-| WORLD-5 | A new world begins with **tier 1 active in all six countries**, and every club starts under AI control. |
+| WORLD-5 | A new world begins with **tiers 1 and 2 active in all nine countries** (18 divisions, 288 clubs), and every club starts under AI control. Promotion and relegation therefore work from the first season. Tier 3 opens when a country fills (`PYR-2`). |
 | WORLD-6 | Clubs persist forever. Only an audited administrative repair may retire a club. |
 | WORLD-7 | Managers never own club records. Control is expressed through time-bounded `ClubTenure` rows. |
-| WORLD-8 | A new manager may take over a club **only in the country's lowest active tier**. Upper-tier vacancies stay under AI control until promotion/relegation changes them or a post-MVP job market exists. |
+| WORLD-8 | A new manager may take over any AI club in **any active tier of the country**. A tier that is not yet active (tier 3 and below, until the country fills) cannot be claimed. A club with a human tenure is not claimable. |
 | WORLD-9 | A takeover inherits the club exactly as it exists: squad, contracts, cash, table record, fixtures, suspensions, injuries, transfer commitments, and history. Nothing resets. |
 | WORLD-10 | Every active division in a country shares the same season and the same matchday calendar. |
+| WORLD-11 | **Seeded squads are fair.** Every new club of a tier opens with the same mix of abilities, each rated by the displayed ability (the rounded mean of the 28 attributes). **Tier 1** is rated 8 to 12: three 12s, four 11s, five 10s, six 9s and six 8s. **Tier 2** is rated 8 to 10: three 10s, nine 9s and twelve 8s. **Tier N below 2** is tier 2 shifted down one rating per tier, never below 5 (tier 3 is 7 to 9). The best players sit in the spine of the team. A club's own diversity is seeded: a coin mirrors its left and right sides, and four slots move one rating (two up, two down) inside the tier's band, so its total ability is the template's. The best eleven of any two clubs in a tier differ by at most 7% (a test cap; about 5% measured). Each squad has exactly **one gem** and **three talents** (`TRN-18`). An emergency replacement (`SQ-8`) and a clean start use the same template. See [ADR-0085](../architecture/adr/0085-fair-seeded-squads-and-two-tiers-from-the-first-season.md). | `squad_template_version` `squad-template-v1` (balancing) |
 
 ---
 
@@ -52,8 +53,8 @@ falls. See [ADR-0005](../architecture/adr/0005-dynamic-pyramid-and-backfill.md).
 
 | Ref | Rule |
 |---|---|
-| PYR-1 | After every successful takeover and every tenure-status change, evaluate the country's current lowest active tier. |
-| PYR-2 | If all 16 clubs in that tier hold active human tenures and no provisioning record exists for the target tier, create a `DivisionProvisioningRequest` for tier `N + 1`. |
+| PYR-1 | After every successful takeover and every tenure-status change, evaluate the country: its clubs and its human-held clubs across **every** active tier. |
+| PYR-2 | If **every club of every active tier** of the country holds an active human tenure (32 clubs with tiers 1 and 2) and no provisioning record exists for the target tier, create a `DivisionProvisioningRequest` for tier `N + 1`, where `N` is the lowest active tier. |
 | PYR-3 | The evaluation runs in a PostgreSQL transaction holding a **country-scoped advisory lock**. `unique (country_id, target_tier)` prevents duplicate tiers. |
 | PYR-4 | A durable worker generates the new tier: 16 AI clubs, balanced squads, finance accounts, division-season entries, fixtures, and a historical baseline. |
 | PYR-5 | The new division uses the **current country season** and the **same matchday calendar**. |
@@ -276,7 +277,7 @@ reseeded.
 | TRN-15 | **Hidden aptitude.** Each player has a training aptitude of 55%–145% (triangular around 100%) derived purely from their identity and never stored. It scales development, so two players of equal potential reach it at different speeds. | 550–1450 permille |
 | TRN-16 | **Decline.** Each attribute declines from its own start age by a yearly slope that grows each year past it: pace and acceleration from 28, agility from 29, stamina and jumping from 30, strength from 31, some technical skills from 29 and the rest from 32, work rate from 31, goalkeeper reflexes from 32 and the other goalkeeping skills from 34. Other mental attributes do not decline. An attribute the player's programme trains declines at half the rate. Decline comes off the same per-attribute progress as growth, so a skill that is trained and ageing nets the two; a point is lost when the progress reaches minus one, and an attribute never falls below 1. | 77 progression days a season (the 11-week cycle, `CAL-6`; the yearly slope per day follows it) |
 | TRN-17 | **History.** Every progression day records, per player, the programme and intensity in force, the development and decline earned, the whole points gained and lost, and which attributes moved. A manager reads it for their own players only. | kept in full |
-| TRN-18 | **Potential.** A generated player's hidden potential is drawn first, as `clamp(tier mean + offset, 1, 20)`, and his skills are derived from it: `potential + age adjustment`, where the adjustment is 24 − age below 24, zero from 24 to 29, and age − 29 above 29. So a 17-year-old starts 7 under his ceiling, a 24 to 29-year-old is at it, and an older player's potential is his peak, with his current skills showing the decline. Position bonuses and per-skill jitter are unchanged. Training develops the player towards the same formula without the jitter (TRN-19). The offset is a band: **normal** 80%, two four-faced dice less four (−4 to +2, most often −1); **talent** 15%, +3 to +5; **gem** 5%, +6 to +7. The bands do not overlap, and the mean offset is about +0.1, so a tier's squad strength is kept. Existing worlds get the new potentials by reseeding. The tier mean here is the generated squads' ability mean (`ability_mean_tier1`); a youth-intake player is drawn on his own scale (TRN-20). | 80% / 15% / 5% (balancing) |
+| TRN-18 | **Potential.** A generated player's hidden potential is drawn first, as `clamp(tier mean + offset, 1, 20)`, and his skills are derived from it: `potential + age adjustment`, where the adjustment is 24 − age below 24, zero from 24 to 29, and age − 29 above 29. So a 17-year-old starts 7 under his ceiling, a 24 to 29-year-old is at it, and an older player's potential is his peak, with his current skills showing the decline. Position bonuses and per-skill jitter are unchanged. Training develops the player towards the same formula without the jitter (TRN-19). The offset is a band: **normal** 80%, two four-faced dice less four (−4 to +2, most often −1); **talent** 15%, +3 to +5; **gem** 5%, +6 to +7. The bands do not overlap, and the mean offset is about +0.1, so a tier's squad strength is kept. Existing worlds get the new potentials by reseeding. The tier mean here is the generated squads' ability mean (`ability_mean_tier1`); a youth-intake player is drawn on his own scale (TRN-20). **A seeded squad is not drawn this way (`WORLD-11`, [ADR-0085](../architecture/adr/0085-fair-seeded-squads-and-two-tiers-from-the-first-season.md)):** its potential is the player's rating plus `ceil(max(0, 24 − age) / 2)`, capped at 20, except exactly one gem (rating + 6 or 7) and three talents (rating + 3 to 5) picked among the players aged 23 or younger; the 80 / 15 / 5 draw still applies to the legacy generators and tools. | 80% / 15% / 5% (balancing) |
 | TRN-19 | **Development limit.** An outfielder develops his 24 outfield attributes; his 4 goalkeeping attributes never grow. A goalkeeper develops all 28. Each developing attribute has a **formula value**, the generator's adult value for his potential and primary position, `clamp(potential + position bonus, 1, 20)` with no jitter. Development stops when the **sum** of his developing attributes reaches the sum of their formula values, so on average a trained player finishes where the generator would have made him; and no attribute may be trained more than **2 points** above its own formula value, so a programme can tilt a player towards its focus (a trained player has more 20s than a generated one) but never let one skill run away. Both are derived from potential and primary position, which never change, so nothing is stored, and the limit is never sent to a client (TRN-9). Decline (TRN-16) can still take an attribute below it. | sum of formula values; headroom 2 |
 | TRN-20 | **Youth potential.** A youth-intake player's potential is drawn with the same bands as TRN-18 around the **youth mean** of his club's tier, `clamp(13 − 2 × (tier − 1), 1, 20)`, which has its own constants. So reseeding the starting world at a lower ability mean never lowers the talent a later intake can reach: a tier-1 gem is still 19–20. | 13 at tier 1, −2 a tier (balancing) |
 | EXP-1 | **Experience** is stored per player, in basis points of the maximum like `TRN-5`…`TRN-7`: 0–10,000, where 100 points are 10,000. The APIs show points to one decimal, with the level and the bonus (`TRN-8`). It is public, like age, so it shows on another club's player. | 0–10,000 bp |
@@ -590,7 +591,7 @@ for a new or weak team, plus a small chance of a hidden gem to train into a star
 | FA-3 | A generated free agent is **age 20 to 32** (most often the middle) and shows a **1–20 ability of 6 to 10** (most often 8), guaranteed by shifting all 28 attributes together. His hidden potential is his ability plus 0 to 2 at age 23 or under and none after, **never above 11**. | `free_agent_ability_min/max` 6 / 10; age 20–32; potential cap 11 |
 | FA-4 | **1%** of the generated players are **hidden gems**: age **17 to 21**, a shown ability of 6 to 10 like any other free agent, and a hidden potential of **13 to 16**. Nothing in any response marks one, and nothing visible or priced reads his potential (`FA-8`). A gem grows only where daily training progression is on. | `free_agent_gem_permille` 10; gem age ≤ 21; potential 13–16 |
 | FA-5 | A listing from the pool has **no seller** (it belongs to the batch). It closes at the **next Monday 12:00**, seven days after it opened, when the auction scheduler resolves it: **a leading bid signs the player** (even one placed on the last day), and **a listing with no bid expires** and the player leaves the page. Only **human managers** may bid, and the AI market neither lists nor bids on them. A bid is refused up front when the bidder's squad already holds **27** players (`SQUAD_FULL`); at the close the buyer's squad must still be at **26 or fewer** and the cash still there, else the listing expires. The fee is paid by the buyer and **leaves the game**; no club receives it. The contract starts in the current season, and if the season is in rollover when the listing resolves, the resolution is retried (700 attempts) until the next season is active. **Released players join on top of the 10%**: every player an AI club released at rollover (`CON-9`) or a manager released (`CON-12`) since the previous batch, with his real ability and age, listed once, at the price in `FA-6`. | window Monday 12:00 → Monday 12:00; squad cap 27 / 26 |
-| FA-6 | Price is the valuation at the **lowest active tier** of the player's country. A **generated** free agent is valued on his **ability with potential set equal to ability**, and his minimum fee is the larger of the minimum bid increment and **25%** of that. A **released** player is a former club player and is valued **in full, with his real potential**, as a club listing's asking price is: his minimum fee is the larger of the minimum bid increment and **100%** of it. The **weekly wage** is the renewal quote on ability alone for both, frozen on the listing and shown before the bid (`CON-5`). | `free_agent_minimum_fee_bp` 2,500; `free_agent_released_fee_bp` 10,000 |
+| FA-6 | Price is the valuation at the **lowest active tier** of the player's country (tier 2 while only tiers 1 and 2 are active, `WORLD-5`). A **generated** free agent is valued on his **ability with potential set equal to ability**, and his minimum fee is the larger of the minimum bid increment and **25%** of that. A **released** player is a former club player and is valued **in full, with his real potential**, as a club listing's asking price is: his minimum fee is the larger of the minimum bid increment and **100%** of it. The **weekly wage** is the renewal quote on ability alone for both, frozen on the listing and shown before the bid (`CON-5`). | `free_agent_minimum_fee_bp` 2,500; `free_agent_released_fee_bp` 10,000 |
 | FA-7 | The contract is **3 seasons at age 21 or under, 2 at 22 to 29, 1 at 30 or over**, and the player joins as a **prospect** at 21 or under, otherwise as **rotation**. Both depend on age alone, so neither points at a gem. | — |
 | FA-8 | A free agent's ability, age and position are public, like any player's. His potential, whether he is a gem, and the batch's gem count are class C2 and never reach a response; a released player's potential moves his fee, as a club listing's does, and is never shown. The scouting card and the public profile read any `FreeAgent` player with no contract, with no club, including a player released since the last batch who has no listing yet. | — |
 
@@ -732,7 +733,9 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 |---|---|---|
 | `clubs_per_division` | 16 | WORLD-4 |
 | `largest_division_ever` / `longest_season_ever` | 18 / 34 (read only by the database check constraints, so a past 18-club season stays valid data) | WORLD-4, CAL-1, RULE-4 |
-| `launch_countries` | ENG, ESP, GER, ITA, FRA, ROU | WORLD-2 |
+| `launch_countries` | ENG, ESP, GER, ITA, FRA, ROU, BEL, POR, NED | WORLD-2 |
+| `seeded_tiers` | 2 | WORLD-5 |
+| `squad_template_version` | `squad-template-v1` (tier 1: 3×12, 4×11, 5×10, 6×9, 6×8; tier 2: 3×10, 9×9, 12×8; −1 a tier below 2, floor 5; 4 balanced nudges; 1 gem, 3 talents; best-eleven spread cap 1.07) | WORLD-11 |
 | `matchdays_per_season` | 30 | CAL-1 |
 | `season_cycle_weeks` | 11 (77 days from one season's first matchday to the next's; also the weekly finance runs, free-agent batches, fan reviews and the weeks of a season) | CAL-6 |
 | `kickoff_utc` | 19:00 | CAL-2 |
@@ -780,15 +783,15 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `dm_thread_page_size` | 50 messages | COM-10 |
 | `generator_version` | `world-gen-v3` (the bootstrap: clubs, squads, and fixtures) | FIC-8, PYR-14 |
 | `club_generator_version` | `world-gen-v1` | FIC-8, PYR-14 |
-| `player_generator_version` | `player-gen-v3` | FIC-8, PYR-14 |
+| `player_generator_version` | `player-gen-v4` | FIC-8, PYR-14 |
 | `schedule_generator_version` | `schedule-gen-v1` | CAL-8, PYR-14 |
 | `player_attr_version` | `player-attr-v1` | FIC-8 |
-| `player_name_pools_version` | `player-name-pools-v1` | FIC-8 |
+| `player_name_pools_version` | `player-name-pools-v2` (nine pools, each 36 given names × 37 surnames) | FIC-8 |
 | `training_progression_version` | `training-v5` | TRN-9 (FIC-8) |
 | `training_base_daily_milli` | 436 thousandths of a point (peak age, neutral aptitude, normal intensity) | TRN-10 (balancing) |
 | `training_programme_share_permille` | 600 (the rest, 400, goes equally to the other developing attributes) | TRN-10 (balancing) |
 | `development_limit_headroom` | 2 points above an attribute's formula value | TRN-19 (balancing) |
-| `world_rule_set_version` | `world-rules-v18` | FIC-8 |
+| `world_rule_set_version` | `world-rules-v19` | FIC-8 |
 | `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
 | `ai_policy_version` | `ai-policy-v1` | INS-12 (FIC-8) |
 | `ai_match_plan_version` | `ai-match-plan-v1` | INS-12, MAT-6 (FIC-8) |
@@ -805,11 +808,11 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `match_stamina_factor_bp` | 12,000 (stamina 1) → 8,000 (stamina 20) | TRN-11 (balancing) |
 | `match_intensity_bp` | 10,000 neutral, bounded 6,000–16,000 | INS-9 (balancing) |
 | `match_morale_win_bp` / `_draw_bp` / `_loss_bp` | 350 / 40 / 350 | TRN-13 (balancing) |
-| `name_pools_version` | `name-pools-v1` | FIC-8 |
+| `name_pools_version` | `name-pools-v2` | FIC-8 |
 | `club_name_capacity_per_pool` | 1,980 (220 × 9) | FIC-4, PYR-11 |
 | `squad_composition` | 3 GK / 7 defenders / 9 midfielders (one a left and one a right midfielder) / 5 attackers | SQ-1 (balancing) |
 | `player_age_range` | 17–34 game years | SQ-1 (balancing) |
-| `ability_mean_tier1` | 13 / 20 | TRN-4 (balancing) |
+| `ability_mean_tier1` | 13 / 20 (the legacy generators and the youth scale; a seeded squad uses `WORLD-11`) | TRN-4 (balancing) |
 | `ability_drop_per_tier` | 2 | TRN-4 (balancing) |
 | `potential_band_shares` | normal 80% / talent 15% / gem 5% | TRN-18, TRN-20 (balancing) |
 | `youth_potential_mean_tier1` / `youth_potential_drop_per_tier` | 13 / 2 | TRN-20 (balancing) |

@@ -181,9 +181,9 @@ Manager claims club
   → serializable transaction: lock manager, club, country capacity, tenure rows
   → insert tenure, update last-active metadata
   → enqueue capacity evaluation + welcome inbox in the same transaction
-  → if the lowest active tier is now 18/18 human: create provisioning request, enqueue
-    ProvisionDivision job (country advisory lock, unique (country, target_tier))
-  → ProvisionDivision generates 18 AI clubs, squads, finances, fixtures, and backfills
+  → if every club of every active tier is now human (32 of 32 with tiers 1 and 2): create provisioning
+    request, enqueue ProvisionDivision job (country advisory lock, unique (country, target_tier))
+  → ProvisionDivision generates 16 AI clubs, squads, finances, fixtures, and backfills
     already-passed matchdays as bootstrap results, then activates the tier for claims
 ```
 

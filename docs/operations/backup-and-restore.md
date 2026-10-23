@@ -50,7 +50,7 @@ the recovered cluster:
 | Job queue integrity | No duplicate `(job_type, business_key)`, no lease without an owner, no unknown status |
 | No leases after sanitize | The restored copy is safe to open (ADR-0008) |
 | Point-in-time target | The `before` marker is present and the `after` marker is absent |
-| World shape | Six countries and at least the seeded tier of clubs |
+| World shape | Nine countries and at least the seeded tiers of clubs (two tiers of 16 in each) |
 
 The point-in-time check is the one that proves the restore stopped where it was told to, rather than
 replaying the whole archive.

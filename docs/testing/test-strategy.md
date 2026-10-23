@@ -141,9 +141,9 @@ forgotten-password replacement with the old password refused and the link single
 in both directions, including that an external `returnUrl` is ignored rather than navigated to; and
 onboarding — manager profile → country → club → the inherited dashboard → resignation.
 
-The onboarding journey **gives its club back** by resigning at the end. A world holds 96 clubs and a
+The onboarding journey **gives its club back** by resigning at the end. A world holds 288 clubs (32 a country) and a
 country that fills with humans waits for the next tier to be generated, so a journey that kept its club
-would exhaust the world after sixteen runs and start failing for a reason that is not a defect. The
+would exhaust a country after thirty-two runs and start failing for a reason that is not a defect. The
 seeder runs in `globalSetup` for the same reason: onboarding needs a world, and the world is an operator
 tool rather than something the stack creates for itself.
 
@@ -186,7 +186,7 @@ milestone's work ([ADR-0046](../architecture/adr/0046-load-supply-chain-and-rest
 
 **Load** (`tests/load/`, `npm run load:*`): k6 scenarios for a sign-in burst, dashboard reads, the
 matchday polling cadence, and auction contention, plus a matchday-publication scenario. The population
-model is the world itself — 96 clubs, so 96 concurrent managers and 288 virtual users at the required
+model is the world itself — 288 clubs, so 288 concurrent managers and 864 virtual users at the required
 three-times headroom. Each request is tagged `read` or `command`, so the read p95 (500 ms) and command
 p95 (800 ms) objectives are asserted per endpoint; an expected `409` on a losing bid is excluded so
 `http_req_failed` still means "a 5xx". The publication scenario needs a due round and fails fast with

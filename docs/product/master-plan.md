@@ -4,7 +4,7 @@
 > **Source:** Expanded from `AI Agent Master Execution Plan Cros.txt`
 > **Product type:** Persistent, asynchronous, server-authoritative football-management MMO
 > **First public client:** Responsive installable web PWA
-> **Initial countries:** England, Spain, Germany, Italy, France, Romania
+> **Initial countries:** England, Spain, Germany, Italy, France, Romania, Belgium, Portugal, the Netherlands (the last three added by ADR-0085)
 > **Data identity:** Fully fictional clubs, players, competitions, badges, and names
 > **Primary stack:** .NET 10, ASP.NET Core, PostgreSQL 17, Angular standalone components and Signals, PrimeNG, Tailwind CSS, HTML5 Canvas
 
@@ -61,9 +61,9 @@ The public MVP MUST provide:
 - Account registration, email verification, login, session rotation, password reset, logout, and account settings.
 - One active manager career/club tenure per account.
 - Country selection and atomic takeover of an AI-controlled club.
-- A single persistent world containing six independent fictional national pyramids.
-- One initial 16-club top division in every launch country.
-- Automatic lower-tier creation whenever the current lowest tier in a country reaches 18/18 active human managers.
+- A single persistent world containing nine independent fictional national pyramids.
+- Two initial 16-club divisions in every launch country: a top division and a second tier, both seeded with equally strong squads (ADR-0085).
+- Automatic lower-tier creation whenever every club of every active tier in a country (32 with tiers 1 and 2) has an active human manager.
 - AI control for vacant clubs and all clubs without a human tenure.
 - Three scheduled league matchdays each week: Tuesday, Thursday, and Sunday.
 - Complete squad, player, lineup, tactics, training, availability, contract, and finance workflows.
@@ -100,8 +100,8 @@ Do not put these on the public MVP critical path:
 
 1. Register and verify an account.
 2. Create a unique manager profile.
-3. Choose one of the six countries.
-4. Take over an available AI club in that country's lowest active tier.
+3. Choose one of the nine countries.
+4. Take over an available AI club in any active tier of that country.
 5. Review inherited squad, league position, finances, contracts, training, and next fixture.
 6. Set a valid default lineup/tactic and optionally a fixture-specific team sheet.
 7. Train players, renew contracts, shortlist targets, and enter transfer auctions.
@@ -121,22 +121,22 @@ All values in this section should be stored in a versioned rule set rather than 
 
 - Production starts with one persistent `GameWorld`.
 - Every domain aggregate carries or can derive `world_id` to preserve future shard/test-world support.
-- The six launch countries are England, Spain, Germany, Italy, France, and Romania.
+- The nine launch countries are England, Spain, Germany, Italy, France, Romania, Belgium, Portugal, and the Netherlands.
 - Country and league display names are fictionalized or generic; do not use protected league branding.
 - Every active division has exactly 16 clubs (18 until `world-rules-v18`, ADR-0083).
-- A new production world begins with tier 1 active in all six countries; all clubs initially use AI control.
+- A new production world begins with tiers 1 and 2 active in all nine countries (18 divisions, 288 clubs) and every club on equally strong squads (ADR-0085); all clubs initially use AI control.
 - Clubs persist forever unless an audited administrative repair retires one. Human managers control clubs through time-bounded tenures; they do not own database club records.
-- New managers may take over an AI club only in the country's **lowest active tier**. Upper-tier vacancies remain under AI control until normal promotion/relegation changes their position or a later job-market feature is added.
+- New managers may take over an AI club in **any active tier** of the country (ADR-0085). A tier that is not yet active cannot be claimed.
 - A manager takes over the club exactly as it exists: squad, contracts, cash, table record, fixtures, suspensions, injuries, transfer commitments, and history do not reset.
 
 ### 3.2 Dynamic pyramid expansion
 
 Expansion is monotonic: once a tier exists, it is never removed because occupancy later falls.
 
-1. After every successful takeover and every tenure-status change, evaluate the country's current lowest active tier.
-2. If all 16 clubs have active human tenures and no next-tier provisioning record exists, atomically create a `DivisionProvisioningRequest` for tier `N + 1`.
+1. After every successful takeover and every tenure-status change, evaluate the country across every active tier.
+2. If every club of every active tier has an active human tenure and no next-tier provisioning record exists, atomically create a `DivisionProvisioningRequest` for tier `N + 1`.
 3. Use a PostgreSQL transaction and a country-scoped advisory lock so concurrent takeovers cannot create duplicate tiers.
-4. A durable worker generates the new tier, 18 AI clubs, balanced squads, finances, fixtures, and historical state.
+4. A durable worker generates the new tier, 16 AI clubs, balanced squads, finances, fixtures, and historical state.
 5. The new division uses the current country season and the same matchday calendar.
 6. For matchdays that have already passed, simulate deterministic AI-vs-AI results in sequence, apply table/player state, and mark them as bootstrap simulations. This gives the new division a legitimate inherited table immediately.
 7. The division becomes claimable only after generation, validation, and backfill complete.
@@ -966,7 +966,7 @@ Every step stores a unique checkpoint and can be resumed. A country failure must
 `POST /api/v1/club-claims` must:
 
 - Require verified active account and no active tenure/cooldown.
-- Validate the requested club is AI-controlled and in the current lowest active tier.
+- Validate the requested club is AI-controlled and in an active tier of the country.
 - Lock manager, club, country capacity, and relevant tenure rows.
 - Insert tenure and update last-active metadata in a serializable transaction.
 - Enqueue welcome/inbox and capacity evaluation outbox events.
@@ -1652,7 +1652,7 @@ Each stage ends with passing CI, updated documentation, migration validation, an
 
 - Add world, country, manager, club, tenure, season, division, generation, and capacity schema.
 - Build deterministic fictional name dictionaries and procedural badge seeds with legal review notes.
-- Implement world-seeder CLI/job: six countries, one tier each, 16 clubs per tier, season shell, finance accounts.
+- Implement world-seeder CLI/job: six countries, one tier each, 16 clubs per tier (ADR-0085 later made it nine countries and two tiers, 288 clubs), season shell, finance accounts.
 - Implement manager profile, country capacity, available clubs, atomic takeover, resignation/cooldown, and inherited-club dashboard.
 - Implement AI control derivation and capacity evaluation that creates provisioning requests, but defer full backfill execution to Stage 11.
 - Build onboarding UI with race-safe conflict/capacity handling.
@@ -2092,8 +2092,8 @@ The MVP is done only when all statements below are true:
 | Old-school core management loop | 4, 8, 9, 10, 13 |
 | Online accounts and real managers | 2, 3 |
 | Persistent MMO/server authority | 3, 6, 11, 12, 14 |
-| Top five European countries plus Romania | 3 |
-| One initial division per country | 3 |
+| Top five European countries plus Romania (and Belgium, Portugal, the Netherlands, ADR-0085) | 3 |
+| Two initial divisions per country (one before ADR-0085) | 3 |
 | Add second/third/further tier as lower tier fills | 11 |
 | AI vacant clubs and inherited state | 3, 8, 11 |
 | Three matchdays weekly | 6 |

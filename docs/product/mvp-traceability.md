@@ -23,7 +23,7 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | F-08 | One active manager career per account | world, auth | 3 | Partial unique index test; `MANAGER_HAS_ACTIVE_CLUB` |
 | F-09 | Country selection | world, web | 3 | Onboarding journey test |
 | F-10 | Atomic takeover of an AI club | world | 3 | Concurrent-claim test: exactly one winner |
-| F-11 | One persistent world, six national pyramids | world | 3 | Seeder test: 6 countries, 96 unique clubs |
+| F-11 | One persistent world, nine national pyramids | world | 3 | Seeder test: 9 countries, 18 divisions, 288 unique clubs |
 | F-12 | One initial 16-club top division per country | world | 3 | Seeder validation |
 | F-13 | Automatic lower-tier creation at 18/18 humans | world, competition, match | 3 (request), 11 (full) | Fill-tier-1 test creates exactly one tier 2; generic path test for tier 3 (`ProvisioningTests`, ADR-0030) |
 | F-14 | AI control for vacant clubs | world, squad | 3, 8 | AI legal-side test with no privileged data |
@@ -78,8 +78,8 @@ Every bullet of master plan §2.2, mapped. A feature is complete only when its s
 | Old-school core management loop | 4, 8, 9, 10, 13 | squad, competition, finance, market, web | Master plan §2.4, product §2.2 F-16…F-29 |
 | Online accounts and real managers | 2, 3 | auth, world | ADR-0002, game rules §4 |
 | Persistent MMO / server authority | 3, 6, 11, 12, 14 | world, competition, ops | ADR-0001, ADR-0003, threat model §4.2 |
-| Top five European countries plus Romania | 3 | world | `WORLD-2` |
-| One initial division per country | 3 | world | `WORLD-5` |
+| Top five European countries plus Romania, Belgium, Portugal, the Netherlands | 3 | world | `WORLD-2`, ADR-0085 |
+| Two initial divisions per country, equally strong squads | 3 | world | `WORLD-5`, `WORLD-11`, ADR-0085 |
 | Add tier N+1 as the lowest tier fills | 11 | world, competition, match | ADR-0005, `PYR-1`…`PYR-14` |
 | AI vacant clubs and inherited state | 3, 8, 11 | world, squad | `WORLD-9`, `INS-12` |
 | Three matchdays weekly | 6 | competition, ops | `CAL-1`, `CAL-2` |

@@ -4,6 +4,17 @@ Notable changes by stage. The stage numbering follows
 [`docs/product/master-plan.md`](docs/product/master-plan.md) Â§16, with engine milestones named by their
 engine version.
 
+## Fair squads plan - equal squads, tier 2 from day one, and three new countries
+
+- **Every seeded club of a tier opens with the same mix of abilities** (`WORLD-11`, `squad-template-v1`). Tier 1 is rated 8 to 12 (three 12s, four 11s, five 10s, six 9s, six 8s); tier 2 is rated 8 to 10 (three 10s, nine 9s, twelve 8s); a deeper tier is one rating lower per tier, never below 5. The best players sit across the spine of the team. A coin mirrors a club's left and right sides and four slots move one rating (two up, two down), so a club's total is the template's. The best eleven of two clubs in a tier differ by at most 7% (tested; about 5% measured, 20% before). Every squad has exactly one gem and three talents. Emergency replacements and clean starts use the same template. `player-gen-v4`.
+- **Tier 2 is seeded with tier 1** in every country, so promotion and relegation work from season 1: a world is 9 countries x 2 tiers x 16 clubs = 18 divisions, 288 clubs, 6,912 players. `world-rules-v19`.
+- **A manager may take a club in any active tier** (`WORLD-8`), and the available-clubs list returns both tiers with their tier. The pyramid grows (`PYR-2`) only when every club of every active tier has a human, and the free-agent price still reads the lowest active tier (`FA-6`).
+- **Belgium, Portugal and the Netherlands** (`BEL`, `POR`, `NED`) join, each with its own club and player name pools, a forum (no code: the section comes from the manager's club) and a blocklist of real clubs and players. All nine player pools are now 36 given names x 37 surnames. `name-pools-v2`, `player-name-pools-v2`. The welcome page says nine pyramids and the club step groups clubs under a tier heading.
+- **Matchday publications take turns** (ADR-0086): publishing 18 divisions at one kickoff collided on read locks of a few shared tables and dead-lettered on the stepped clock.
+- **Measured, not retuned.** Season-1 wages fall to 13 / 16 / 28 / 54% of income in tiers 1 to 4 (64 / 56 / 59 / 62% before), so clubs are about three times as rich by season 10. Tier 2 v 2 scored 4.27 goals a match (19% with 7 or more) before the keeper dive started part-way through a tick, 2.38 after; tier 1 v 1 1.96 and 1.51 (1.78 before). Free agents of ability 9 or 10 are a third of the pool and upgrade a tier-1 8. The economy, engine calibration and free-agent range are open decisions.
+- **Existing worlds are not migrated.** Drop the database and reseed (`npm run infra:reset`, `infra:up`, `migrate`, `seed`).
+- Docs: `game-rules.md` `WORLD-2`, `WORLD-5`, `WORLD-8`, new `WORLD-11`, `PYR-1`, `PYR-2`, `TRN-18`, `FA-6` and section 18; README, master plan, glossary, traceability, context, modules, data model, test strategy, load testing, runbook, restore drill; ADR-0085, with ADR-0005, 0076, 0082 and 0083 marked as amended.
+
 ## League size plan - 16 clubs and 30 matchdays
 
 - Every division now has **16 clubs** and a season **30 matchdays** (8 fixtures a round, 15 home matches, 240 fixtures a division-season; a seeded world is 6 countries of 16, 96 clubs). Promotion and relegation stay at three up and three down. Rule set `world-rules-v18`.

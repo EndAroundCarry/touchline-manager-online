@@ -11,7 +11,7 @@ the rule reference in [`game-rules.md`](game-rules.md) is given.
 | Term | Definition |
 |---|---|
 | **World** | The single persistent game universe containing all countries, divisions, clubs, players, seasons, finances, and history. Production runs exactly one (`WORLD-1`). Schemas still carry `world_id` so test worlds are possible. |
-| **Country** | One of the six fictional national pyramids: England, Spain, Germany, Italy, France, Romania (`WORLD-2`). A country owns its divisions, clubs, and name pools. |
+| **Country** | One of the nine fictional national pyramids: England, Spain, Germany, Italy, France, Romania, Belgium, Portugal, the Netherlands (`WORLD-2`). A country owns its divisions, clubs, and name pools. |
 | **Division** | A competitive tier within a country, identified by `tier_number >= 1`. Every active division has exactly 16 clubs (`WORLD-4`). Tiers are monotonic: once created, never removed (`PYR-12`). |
 | **Division-season** | The instance of a division playing one specific season. Fixtures, matchdays, standings, and season stats hang off the division-season, never off the division directly. |
 | **Season** | One full competitive cycle in a country: 30 matchdays of double round-robin play, followed by a rollover of nine days that completes a fixed 11-week cycle (`CAL-1`, `CAL-6`). |
@@ -33,10 +33,11 @@ the rule reference in [`game-rules.md`](game-rules.md) is given.
 | **Human managed** | A club with an active tenure whose account is not suspended and whose release date is null. Only human-managed clubs count toward pyramid capacity. |
 | **AI controlled** | A club with no active tenure, or one whose tenure is inactive/closed. AI decisions are made by the same validators as humans and receive no privileged information (`INS-12`, `FIN-15`). |
 | **Inactive tenure** | A tenure that reached 14 days without a login. AI makes safe lineup and training decisions; the manager resumes simply by logging in (`OCC-2`). |
-| **Vacancy** | A club in the lowest active tier with no active tenure. Takeover is permitted only in the lowest active tier (`WORLD-8`). |
+| **Vacancy** | A club in an active tier with no active tenure. Takeover is permitted in any active tier of its country (`WORLD-8`). |
 | **Takeover / claim** | The atomic act of a manager taking control of an AI club, inheriting its complete existing state (`WORLD-9`). |
 | **Cooldown** | The seven-day period after voluntary resignation during which the manager may not take over another club (`OCC-4`). |
-| **Division provisioning** | The asynchronous creation of a new lowest tier when the current lowest tier fills with human managers, including deterministic backfill of already-played matchdays (`PYR-1` … `PYR-14`). |
+| **Squad template** | The fixed mix of ratings every seeded club of a tier opens with: tier 1 is rated 8 to 12, tier 2 is rated 8 to 10, each tier below is one rating lower, never below 5. Each squad also has exactly one gem and three talents (`WORLD-11`, ADR-0085). |
+| **Division provisioning** | The asynchronous creation of a new lowest tier when every club of every active tier of the country has a human manager, including deterministic backfill of already-played matchdays (`PYR-1` … `PYR-14`). |
 
 ## Squad and players
 

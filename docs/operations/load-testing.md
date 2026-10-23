@@ -6,9 +6,9 @@ The scripts live in [`tests/load/`](../../tests/load/README.md).
 
 ## The population model
 
-One world of six countries with sixteen clubs each is **96 clubs**, so one human manager per club is
-**96 concurrent users**. The stage requires at least three times headroom, which the suite models as
-**288 virtual users**. Both numbers live in `tests/load/config.js`; every scenario scales from them.
+One world of nine countries with two tiers of sixteen clubs each is **288 clubs**, so one human manager per club is
+**288 concurrent users**. The stage requires at least three times headroom, which the suite models as
+**864 virtual users**. Both numbers live in `tests/load/config.js`; every scenario scales from them.
 
 ## The objectives
 

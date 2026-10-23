@@ -1,6 +1,7 @@
 # ADR-0082: A community forum, international and per country
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0085](0085-fair-seeded-squads-and-two-tiers-from-the-first-season.md): there are nine countries, so nine country forums (Belgium, Portugal and the Netherlands are new); no code changed.
 - **Date:** 2026-10-22
 - **Stage:** Community plan (the Messages menu becomes Community)
 - **Related:** [ADR-0079](0079-direct-messages-between-managers.md), game-rules `COM-17`…`COM-20`, `FIC-9`

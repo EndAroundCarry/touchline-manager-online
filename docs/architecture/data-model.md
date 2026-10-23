@@ -836,6 +836,13 @@ erDiagram
 > behind: `club_accounts.state_since_matchday` (season x 34), sponsor deals stored per matchday (/34).
 > ADR-0083.
 >
+> **Fair squads milestone (nine countries, two seeded tiers).** No schema change and no migration. The seeder now writes
+> nine countries with two active divisions each (18 divisions, 288 clubs, 6,912 players), and the claim, capacity and
+> available-clubs queries read every active division of a country instead of the lowest one (`WORLD-8`, `PYR-2`;
+> `CountryCapacity.ClubsInCountry`, `HumanOccupiedClubs`). The rule set advances to `world-rules-v19`, the player generator
+> to `player-gen-v4`, the pools to `name-pools-v2` and `player-name-pools-v2`, and the seed's input hash includes
+> `SeededTiers` and `squad-template-v1`. Worlds are not migrated (`RULE-4`). ADR-0085.
+>
 > **Stage 12 status (season history).** No schema change: the closed entries are read back as a club's
 > season history and next-season placement (`PR-4`, `PR-6`), and the retained `player_season_stats` rows are
 > aggregated across seasons as a player's career (`STA-2`). The club-identity seed fix (ADR-0033) changes
