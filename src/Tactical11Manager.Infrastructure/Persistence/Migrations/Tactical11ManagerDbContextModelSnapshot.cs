@@ -1092,6 +1092,14 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("kickoff_at");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("league")
+                        .HasColumnName("kind");
+
                     b.Property<DateTimeOffset>("LockAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lock_at");
@@ -1128,6 +1136,8 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
 
                     b.ToTable("matchdays", "competition", t =>
                         {
+                            t.HasCheckConstraint("ck_matchdays_kind", "kind in ('league', 'playoff')");
+
                             t.HasCheckConstraint("ck_matchdays_lock_before_kickoff", "lock_at < kickoff_at");
 
                             t.HasCheckConstraint("ck_matchdays_publication_status", "publication_status in ('pending', 'staged', 'published')");
@@ -1292,6 +1302,163 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_player_season_stats_counts", "appearances >= 0 and starts >= 0 and starts <= appearances and minutes_played >= 0 and goals >= 0 and assists >= 0 and shots >= 0 and shots_on_target >= 0 and shots_on_target <= shots and saves >= 0 and yellow_cards >= 0 and red_cards >= 0 and rating_basis_points_total >= 0 and rated_appearances >= 0 and passes_attempted >= 0 and passes_completed >= 0 and passes_completed <= passes_attempted and dribbles_attempted >= 0 and dribbles_completed >= 0 and dribbles_completed <= dribbles_attempted and tackles_attempted >= 0 and tackles_won >= 0 and tackles_won <= tackles_attempted and crosses_attempted >= 0 and crosses_completed >= 0 and crosses_completed <= crosses_attempted and penalties_taken >= 0 and penalties_scored >= 0 and penalties_scored <= penalties_taken and penalties_faced >= 0 and penalties_saved >= 0 and penalties_saved <= penalties_faced and free_kicks_taken >= 0 and free_kicks_scored >= 0 and free_kicks_scored <= free_kicks_taken and shots_on_target_faced >= 0 and saves <= shots_on_target_faced");
 
                             t.HasCheckConstraint("ck_player_season_stats_rating", "case when rated_appearances = 0 then 0 else rating_basis_points_total / rated_appearances end between 0 and 10000");
+                        });
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Competition.PlayoffTie", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AwayClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("away_club_id");
+
+                    b.Property<Guid?>("AwayDivisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("away_division_id");
+
+                    b.Property<int?>("AwayPlace")
+                        .HasColumnType("integer")
+                        .HasColumnName("away_place");
+
+                    b.Property<Guid>("CountryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("country_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DecidedBy")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("decided_by");
+
+                    b.Property<Guid?>("FeederDivisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("feeder_division_id");
+
+                    b.Property<Guid?>("FixtureId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fixture_id");
+
+                    b.Property<Guid>("HomeClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("home_club_id");
+
+                    b.Property<Guid>("HomeDivisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("home_division_id");
+
+                    b.Property<int>("HomePlace")
+                        .HasColumnType("integer")
+                        .HasColumnName("home_place");
+
+                    b.Property<Guid?>("LoserClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("loser_club_id");
+
+                    b.Property<Guid>("ParentDivisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_division_id");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<int?>("ShootoutAwayScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("shootout_away_score");
+
+                    b.Property<int?>("ShootoutHomeScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("shootout_home_score");
+
+                    b.Property<string>("ShootoutKicks")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("shootout_kicks");
+
+                    b.Property<int>("Slot")
+                        .HasColumnType("integer")
+                        .HasColumnName("slot");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("stage");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.Property<Guid?>("WinnerClubId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("winner_club_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AwayClubId");
+
+                    b.HasIndex("AwayDivisionId");
+
+                    b.HasIndex("CountryId");
+
+                    b.HasIndex("FeederDivisionId");
+
+                    b.HasIndex("FixtureId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_playoff_ties_fixture_id");
+
+                    b.HasIndex("HomeClubId");
+
+                    b.HasIndex("HomeDivisionId");
+
+                    b.HasIndex("LoserClubId");
+
+                    b.HasIndex("ParentDivisionId");
+
+                    b.HasIndex("WinnerClubId");
+
+                    b.HasIndex("SeasonId", "ParentDivisionId", "Stage", "FeederDivisionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_playoff_ties_season_parent_stage_feeder");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("SeasonId", "ParentDivisionId", "Stage", "FeederDivisionId"), false);
+
+                    b.ToTable("playoff_ties", "competition", t =>
+                        {
+                            t.HasCheckConstraint("ck_playoff_ties_away_side", "(away_club_id is null) = (away_division_id is null) and (away_club_id is null) = (away_place is null)");
+
+                            t.HasCheckConstraint("ck_playoff_ties_decided_by", "decided_by is null or decided_by in ('score', 'penalties')");
+
+                            t.HasCheckConstraint("ck_playoff_ties_decision", "(winner_club_id is null) = (loser_club_id is null) and (winner_club_id is null) = (decided_by is null)");
+
+                            t.HasCheckConstraint("ck_playoff_ties_distinct_clubs", "home_club_id <> away_club_id");
+
+                            t.HasCheckConstraint("ck_playoff_ties_fixture_needs_sides", "fixture_id is null or away_club_id is not null");
+
+                            t.HasCheckConstraint("ck_playoff_ties_loser", "loser_club_id is null or ((loser_club_id = home_club_id or loser_club_id = away_club_id) and loser_club_id <> winner_club_id)");
+
+                            t.HasCheckConstraint("ck_playoff_ties_places", "home_place >= 1 and (away_place is null or away_place >= 1)");
+
+                            t.HasCheckConstraint("ck_playoff_ties_semi_final_sides", "stage <> 'semi_final' or away_club_id is not null");
+
+                            t.HasCheckConstraint("ck_playoff_ties_shootout_decision", "(shootout_home_score is not null) = coalesce(decided_by = 'penalties', false)");
+
+                            t.HasCheckConstraint("ck_playoff_ties_shootout_score", "(shootout_home_score is null) = (shootout_away_score is null) and (shootout_home_score is null or (shootout_home_score >= 0 and shootout_away_score >= 0))");
+
+                            t.HasCheckConstraint("ck_playoff_ties_slot", "slot between 1 and 3");
+
+                            t.HasCheckConstraint("ck_playoff_ties_stage", "stage in ('semi_final', 'final')");
+
+                            t.HasCheckConstraint("ck_playoff_ties_winner", "winner_club_id is null or winner_club_id = home_club_id or winner_club_id = away_club_id");
                         });
                 });
 
@@ -5841,6 +6008,69 @@ namespace Tactical11Manager.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Tactical11Manager.Domain.Competition.PlayoffTie", b =>
+                {
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("AwayClubId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Division", null)
+                        .WithMany()
+                        .HasForeignKey("AwayDivisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Tactical11Manager.Domain.World.Country", null)
+                        .WithMany()
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Division", null)
+                        .WithMany()
+                        .HasForeignKey("FeederDivisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Fixture", null)
+                        .WithMany()
+                        .HasForeignKey("FixtureId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("HomeClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Division", null)
+                        .WithMany()
+                        .HasForeignKey("HomeDivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("LoserClubId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Division", null)
+                        .WithMany()
+                        .HasForeignKey("ParentDivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.Competition.Season", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tactical11Manager.Domain.World.Club", null)
+                        .WithMany()
+                        .HasForeignKey("WinnerClubId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Tactical11Manager.Domain.Competition.Season", b =>

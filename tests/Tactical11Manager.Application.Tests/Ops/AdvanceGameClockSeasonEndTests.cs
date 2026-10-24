@@ -210,6 +210,11 @@ public sealed class AdvanceGameClockSeasonEndTests
 
         public Task<FixtureSidesSnapshot?> LoadFixtureSidesAsync(Guid fixtureId, CancellationToken cancellationToken) => throw new NotSupportedException();
 
+        public Task<IReadOnlyList<ClubSeasonPlacement>> LoadClubPlacementsAsync(
+            Guid seasonId,
+            IReadOnlyCollection<Guid> clubIds,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<DivisionTableSource?> LoadTableSourceAsync(Guid divisionSeasonId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 

@@ -190,6 +190,14 @@ public sealed record FixtureMatchLoadRow(
     string SnapshotJson,
     string StatisticsJson);
 
+/// <summary>Where a club plays in a season: its division-season, league and tier, from its season entry.</summary>
+/// <param name="ClubId">The club.</param>
+/// <param name="DivisionSeasonId">The club's division-season.</param>
+/// <param name="DivisionId">The club's league.</param>
+/// <param name="Tier">The league's tier.</param>
+/// <param name="League">The league's number within the tier.</param>
+public sealed record ClubSeasonPlacement(Guid ClubId, Guid DivisionSeasonId, Guid DivisionId, int Tier, int League);
+
 /// <summary>
 /// The competition module's port for the matchday workflow (master plan §7.3, §7.4).
 /// </summary>
@@ -244,7 +252,20 @@ public interface IMatchdayRepository
     /// <returns>The sides, or null when the fixture is unknown.</returns>
     Task<FixtureSidesSnapshot?> LoadFixtureSidesAsync(Guid fixtureId, CancellationToken cancellationToken);
 
-    /// <summary>Loads everything a division's table is computed from.</summary>
+    /// <summary>
+    /// Loads where each of the given clubs plays in a season. A play-off match is hosted in one league's division-season
+    /// but is played by clubs of two, so the publication that handles it asks each club for its own.
+    /// </summary>
+    /// <param name="seasonId">The season.</param>
+    /// <param name="clubIds">The clubs.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>One placement per club that has an entry in the season.</returns>
+    Task<IReadOnlyList<ClubSeasonPlacement>> LoadClubPlacementsAsync(
+        Guid seasonId,
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>Loads everything a division's table is computed from. Only the league's own rounds count; a play-off match is outside the table.</summary>
     /// <param name="divisionSeasonId">The division-season.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The table's inputs, or null when the division-season is unknown.</returns>
@@ -319,8 +340,8 @@ public interface IMatchdayRepository
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Loads every published fixture of a division-season as the match-load row the statistics rule reads
-    /// (`STA-1`, `TBL-13`), so a rebuild can recompute a whole season at once.
+    /// Loads every published fixture of a division-season's league rounds as the match-load row the statistics rule reads
+    /// (`STA-1`, `TBL-13`), so a rebuild can recompute a whole season at once. A play-off round hosted there is left out.
     /// </summary>
     /// <param name="divisionSeasonId">The division-season.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -330,7 +351,7 @@ public interface IMatchdayRepository
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Loads every shot and save event of a division-season's published fixtures (`STA-3`, `TBL-13`).
+    /// Loads every shot and save event of a division-season's published league fixtures (`STA-3`, `TBL-13`); a play-off round hosted there is left out.
     /// </summary>
     /// <param name="divisionSeasonId">The division-season.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

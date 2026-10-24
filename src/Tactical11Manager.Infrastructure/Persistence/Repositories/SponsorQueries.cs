@@ -58,6 +58,7 @@ internal sealed class SponsorQueries : ISponsorQueries
         var published = await _dbContext.Matchdays
             .CountAsync(
                 matchday => matchday.DivisionSeasonId == row.DivisionSeasonId
+                    && matchday.Kind == MatchdayKind.League
                     && matchday.PublicationStatus == MatchdayPublicationStatus.Published,
                 cancellationToken);
 
@@ -94,6 +95,7 @@ internal sealed class SponsorQueries : ISponsorQueries
     public Task<int> CountMatchdaysPublishedSinceAsync(Guid divisionSeasonId, DateTimeOffset since, CancellationToken cancellationToken) =>
         _dbContext.Matchdays.CountAsync(
             matchday => matchday.DivisionSeasonId == divisionSeasonId
+                && matchday.Kind == MatchdayKind.League
                 && matchday.PublicationStatus == MatchdayPublicationStatus.Published
                 && matchday.UpdatedAt > since,
             cancellationToken);

@@ -347,6 +347,7 @@ public static class DependencyInjection
     private static void AddMatchdayInfrastructure(IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IMatchdayRepository, MatchdayRepository>();
+        services.AddScoped<IPlayoffRepository, PlayoffRepository>();
 
         services
             .AddOptions<MatchdayOptions>()

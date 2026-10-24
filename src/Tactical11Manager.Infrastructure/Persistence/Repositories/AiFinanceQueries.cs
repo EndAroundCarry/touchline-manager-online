@@ -60,6 +60,7 @@ internal sealed class AiFinanceQueries : IAiFinanceQueries
             from matchday in _dbContext.Matchdays
             join divisionSeason in _dbContext.DivisionSeasons on matchday.DivisionSeasonId equals divisionSeason.Id
             where divisionSeason.SeasonId == season.SeasonId
+                && matchday.Kind == MatchdayKind.League
                 && matchday.PublicationStatus == MatchdayPublicationStatus.Published
             select (int?)matchday.RoundNumber)
             .MaxAsync(cancellationToken) ?? 0;

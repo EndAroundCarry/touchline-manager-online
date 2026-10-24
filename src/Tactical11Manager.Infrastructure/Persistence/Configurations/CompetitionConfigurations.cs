@@ -270,7 +270,8 @@ internal sealed class ClubSeasonEntryConfiguration : IEntityTypeConfiguration<Cl
 /// <remarks>
 /// The unique index on <c>(division_season_id, round_number)</c> is what makes "30 rounds, one row each"
 /// a database fact rather than a generation promise, and the lock check keeps the derived lock instant
-/// from drifting past the kickoff it belongs to (`CAL-3`).
+/// from drifting past the kickoff it belongs to (`CAL-3`). The <c>kind</c> column tells a league round from a
+/// promotion play-off round, which sits in its host league's division-season at round 31 to 33 (`PR-4`).
 /// </remarks>
 internal sealed class MatchdayConfiguration : IEntityTypeConfiguration<Matchday>
 {
@@ -288,6 +289,9 @@ internal sealed class MatchdayConfiguration : IEntityTypeConfiguration<Matchday>
                 "ck_matchdays_publication_status",
                 "publication_status in ('pending', 'staged', 'published')");
             table.HasCheckConstraint("ck_matchdays_lock_before_kickoff", "lock_at < kickoff_at");
+            table.HasCheckConstraint(
+                "ck_matchdays_kind",
+                $"kind in ('{MatchdayKinds.LeagueCode}', '{MatchdayKinds.PlayoffCode}')");
         });
 
         builder.HasKey(matchday => matchday.Id);
@@ -307,8 +311,12 @@ internal sealed class MatchdayConfiguration : IEntityTypeConfiguration<Matchday>
         builder.Property(matchday => matchday.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(matchday => matchday.Version).HasColumnName("version").IsRequired();
 
-        // Not stored yet: the kind column arrives with the play-off schema (milestone 3). Until then every row is a league round.
-        builder.Ignore(matchday => matchday.Kind);
+        builder.Property(matchday => matchday.Kind)
+            .HasColumnName("kind")
+            .HasMaxLength(MatchdayKinds.MaxCodeLength)
+            .HasConversion(kind => kind.ToCode(), code => MatchdayKindRules.FromCode(code))
+            .HasDefaultValue(MatchdayKind.League)
+            .IsRequired();
 
         builder.HasIndex(matchday => new { matchday.DivisionSeasonId, matchday.RoundNumber })
             .IsUnique()
@@ -573,6 +581,168 @@ internal sealed class PlayerSeasonStatConfiguration : IEntityTypeConfiguration<P
         builder.HasOne<Club>()
             .WithMany()
             .HasForeignKey(stat => stat.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>
+/// Maps <c>competition.playoff_ties</c>: one match of a season's promotion play-off bracket, from the draw to the club
+/// that goes through (`PR-4`, `PR-6`).
+/// </summary>
+/// <remarks>
+/// <para>
+/// A bracket's ties are all created when it is drawn, and a final waits with no away club until its semi-final is
+/// decided, so the nullable columns follow the tie's life: the away side, the fixture, then the winner, the loser, the
+/// way it was decided and, for a shoot-out, the score and the kicks. The checks keep each group together: a side is a
+/// club, a league and a place or none of them, a decision comes with a winner and a loser, and a shoot-out score is for
+/// both sides.
+/// </para>
+/// <para>
+/// One tie per stage and feeder league in a parent league and season is a database fact, with an absent feeder counted
+/// as a value so that a stage that has none cannot be drawn twice; one fixture belongs to one tie.
+/// </para>
+/// </remarks>
+internal sealed class PlayoffTieConfiguration : IEntityTypeConfiguration<PlayoffTie>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<PlayoffTie> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("playoff_ties", "competition", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_playoff_ties_stage",
+                $"stage in ('{PlayoffStages.SemiFinalCode}', '{PlayoffStages.FinalCode}')");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_decided_by",
+                $"decided_by is null or decided_by in ('{PlayoffDecisions.ScoreCode}', '{PlayoffDecisions.PenaltiesCode}')");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_slot",
+                $"slot between 1 and {WorldRuleSet.PlayoffSlots}");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_places",
+                "home_place >= 1 and (away_place is null or away_place >= 1)");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_distinct_clubs",
+                "home_club_id <> away_club_id");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_away_side",
+                "(away_club_id is null) = (away_division_id is null) and (away_club_id is null) = (away_place is null)");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_semi_final_sides",
+                $"stage <> '{PlayoffStages.SemiFinalCode}' or away_club_id is not null");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_fixture_needs_sides",
+                "fixture_id is null or away_club_id is not null");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_winner",
+                "winner_club_id is null or winner_club_id = home_club_id or winner_club_id = away_club_id");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_loser",
+                "loser_club_id is null or ((loser_club_id = home_club_id or loser_club_id = away_club_id) "
+                + "and loser_club_id <> winner_club_id)");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_decision",
+                "(winner_club_id is null) = (loser_club_id is null) and (winner_club_id is null) = (decided_by is null)");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_shootout_score",
+                "(shootout_home_score is null) = (shootout_away_score is null) "
+                + "and (shootout_home_score is null or (shootout_home_score >= 0 and shootout_away_score >= 0))");
+            table.HasCheckConstraint(
+                "ck_playoff_ties_shootout_decision",
+                $"(shootout_home_score is not null) = coalesce(decided_by = '{PlayoffDecisions.PenaltiesCode}', false)");
+        });
+
+        builder.HasKey(tie => tie.Id);
+        builder.Property(tie => tie.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(tie => tie.SeasonId).HasColumnName("season_id").IsRequired();
+        builder.Property(tie => tie.CountryId).HasColumnName("country_id").IsRequired();
+        builder.Property(tie => tie.ParentDivisionId).HasColumnName("parent_division_id").IsRequired();
+        builder.Property(tie => tie.FeederDivisionId).HasColumnName("feeder_division_id");
+        builder.Property(tie => tie.Stage)
+            .HasColumnName("stage")
+            .HasMaxLength(PlayoffStages.MaxCodeLength)
+            .HasConversion(stage => stage.ToCode(), code => PlayoffStageRules.FromCode(code))
+            .IsRequired();
+        builder.Property(tie => tie.Slot).HasColumnName("slot").IsRequired();
+        builder.Property(tie => tie.HomeClubId).HasColumnName("home_club_id").IsRequired();
+        builder.Property(tie => tie.HomeDivisionId).HasColumnName("home_division_id").IsRequired();
+        builder.Property(tie => tie.HomePlace).HasColumnName("home_place").IsRequired();
+        builder.Property(tie => tie.AwayClubId).HasColumnName("away_club_id");
+        builder.Property(tie => tie.AwayDivisionId).HasColumnName("away_division_id");
+        builder.Property(tie => tie.AwayPlace).HasColumnName("away_place");
+        builder.Property(tie => tie.FixtureId).HasColumnName("fixture_id");
+        builder.Property(tie => tie.WinnerClubId).HasColumnName("winner_club_id");
+        builder.Property(tie => tie.LoserClubId).HasColumnName("loser_club_id");
+        builder.Property(tie => tie.DecidedBy)
+            .HasColumnName("decided_by")
+            .HasMaxLength(PlayoffDecisions.MaxCodeLength)
+            .HasConversion(
+                decision => decision == null ? null : decision.Value.ToCode(),
+                code => code == null ? null : PlayoffDecisionRules.FromCode(code));
+        builder.Property(tie => tie.ShootoutHomeScore).HasColumnName("shootout_home_score");
+        builder.Property(tie => tie.ShootoutAwayScore).HasColumnName("shootout_away_score");
+        builder.Property(tie => tie.ShootoutKicks).HasColumnName("shootout_kicks").HasColumnType("jsonb");
+        builder.Property(tie => tie.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(tie => tie.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(tie => tie.Version).HasColumnName("version").IsRequired();
+
+        builder.Ignore(tie => tie.IsDecided);
+        builder.Ignore(tie => tie.HasBothSides);
+
+        builder.HasIndex(tie => new { tie.SeasonId, tie.ParentDivisionId, tie.Stage, tie.FeederDivisionId })
+            .IsUnique()
+            .AreNullsDistinct(false)
+            .HasDatabaseName("ux_playoff_ties_season_parent_stage_feeder");
+
+        builder.HasIndex(tie => tie.FixtureId)
+            .IsUnique()
+            .HasDatabaseName("ux_playoff_ties_fixture_id");
+
+        builder.HasOne<Season>()
+            .WithMany()
+            .HasForeignKey(tie => tie.SeasonId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Country>()
+            .WithMany()
+            .HasForeignKey(tie => tie.CountryId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Division>()
+            .WithMany()
+            .HasForeignKey(tie => tie.ParentDivisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Division>()
+            .WithMany()
+            .HasForeignKey(tie => tie.FeederDivisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Division>()
+            .WithMany()
+            .HasForeignKey(tie => tie.HomeDivisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Division>()
+            .WithMany()
+            .HasForeignKey(tie => tie.AwayDivisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Club>()
+            .WithMany()
+            .HasForeignKey(tie => tie.HomeClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Club>()
+            .WithMany()
+            .HasForeignKey(tie => tie.AwayClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Club>()
+            .WithMany()
+            .HasForeignKey(tie => tie.WinnerClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Club>()
+            .WithMany()
+            .HasForeignKey(tie => tie.LoserClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Fixture>()
+            .WithMany()
+            .HasForeignKey(tie => tie.FixtureId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

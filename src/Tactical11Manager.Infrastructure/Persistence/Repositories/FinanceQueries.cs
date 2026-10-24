@@ -279,6 +279,7 @@ internal sealed class FinanceQueries : IFinanceQueries
                 join matchday in _dbContext.Matchdays on divisionSeason.Id equals matchday.DivisionSeasonId
                 where entry.ClubId == clubId
                     && divisionSeason.SeasonId == season.SeasonId
+                    && matchday.Kind == MatchdayKind.League
                     && matchday.PublicationStatus == MatchdayPublicationStatus.Published
                 select (int?)matchday.RoundNumber)
                 .MaxAsync(cancellationToken) ?? 0;
@@ -357,6 +358,7 @@ internal sealed class FinanceQueries : IFinanceQueries
             from matchday in _dbContext.Matchdays
             join divisionSeason in _dbContext.DivisionSeasons on matchday.DivisionSeasonId equals divisionSeason.Id
             where divisionSeason.SeasonId == season.SeasonId
+                && matchday.Kind == MatchdayKind.League
                 && matchday.PublicationStatus == MatchdayPublicationStatus.Published
             select (int?)matchday.RoundNumber)
             .MaxAsync(cancellationToken);

@@ -116,6 +116,9 @@ public sealed class Tactical11ManagerDbContext : DbContext
     /// <summary>Gets the competition module's fixtures.</summary>
     public DbSet<Fixture> Fixtures => Set<Fixture>();
 
+    /// <summary>Gets the promotion play-off ties.</summary>
+    public DbSet<PlayoffTie> PlayoffTies => Set<PlayoffTie>();
+
     /// <summary>Gets the competition module's stored league tables, one row per club per division-season.</summary>
     public DbSet<Standing> Standings => Set<Standing>();
 

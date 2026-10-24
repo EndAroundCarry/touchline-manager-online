@@ -451,6 +451,14 @@ internal sealed class SquadQueries : ISquadQueries
         var divisionSeasonIds = played.Select(item => item.DivisionSeasonId).Distinct().ToList();
         var clubIds = played.Select(item => item.ClubId).Distinct().ToList();
 
+        // A play-off match is hosted in one league's division-season but played by clubs of two, so the visiting club's
+        // match is not in any division-season the player has a line for: it is found through the season instead (PR-4).
+        var seasonIds = await _dbContext.DivisionSeasons
+            .Where(divisionSeason => divisionSeasonIds.Contains(divisionSeason.Id))
+            .Select(divisionSeason => divisionSeason.SeasonId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
         var fixtures = await (
             from fixture in _dbContext.Fixtures
             join matchday in _dbContext.Matchdays on fixture.MatchdayId equals matchday.Id
@@ -459,7 +467,8 @@ internal sealed class SquadQueries : ISquadQueries
             join match in _dbContext.Matches on fixture.Id equals match.FixtureId
             join home in _dbContext.Clubs on fixture.HomeClubId equals home.Id
             join away in _dbContext.Clubs on fixture.AwayClubId equals away.Id
-            where divisionSeasonIds.Contains(matchday.DivisionSeasonId)
+            where (divisionSeasonIds.Contains(matchday.DivisionSeasonId)
+                    || (matchday.Kind == MatchdayKind.Playoff && seasonIds.Contains(divisionSeason.SeasonId)))
                 && fixture.Status == FixtureStatus.Published
                 && (clubIds.Contains(fixture.HomeClubId) || clubIds.Contains(fixture.AwayClubId))
             orderby season.SequenceNumber descending, matchday.RoundNumber descending

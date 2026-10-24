@@ -141,6 +141,27 @@ internal sealed class MatchdayRepository : IMatchdayRepository
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<ClubSeasonPlacement>> LoadClubPlacementsAsync(
+        Guid seasonId,
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken) =>
+        clubIds.Count == 0
+            ? []
+            : await (
+                from entry in _dbContext.ClubSeasonEntries
+                join divisionSeason in _dbContext.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+                join division in _dbContext.Divisions on divisionSeason.DivisionId equals division.Id
+                where entry.SeasonId == seasonId && clubIds.Contains(entry.ClubId)
+                orderby entry.ClubId
+                select new ClubSeasonPlacement(
+                    entry.ClubId,
+                    divisionSeason.Id,
+                    division.Id,
+                    division.TierNumber,
+                    division.LeagueNumber))
+                .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
     public async Task<DivisionTableSource?> LoadTableSourceAsync(
         Guid divisionSeasonId,
         CancellationToken cancellationToken)
@@ -163,6 +184,7 @@ internal sealed class MatchdayRepository : IMatchdayRepository
             from fixture in _dbContext.Fixtures
             join matchday in _dbContext.Matchdays on fixture.MatchdayId equals matchday.Id
             where matchday.DivisionSeasonId == divisionSeasonId
+                && matchday.Kind == MatchdayKind.League
                 && fixture.Status == FixtureStatus.Published
                 && fixture.HomeScore != null
                 && fixture.AwayScore != null
@@ -340,6 +362,7 @@ internal sealed class MatchdayRepository : IMatchdayRepository
             join matchday in _dbContext.Matchdays on fixture.MatchdayId equals matchday.Id
             join snapshot in _dbContext.InputSnapshots on fixture.Id equals snapshot.FixtureId
             where matchday.DivisionSeasonId == divisionSeasonId
+                && matchday.Kind == MatchdayKind.League
                 && fixture.Status == FixtureStatus.Published
             orderby fixture.Id
             select new FixtureMatchLoadRow(
@@ -359,6 +382,7 @@ internal sealed class MatchdayRepository : IMatchdayRepository
             join fixture in _dbContext.Fixtures on matchEvent.MatchId equals fixture.MatchId
             join matchday in _dbContext.Matchdays on fixture.MatchdayId equals matchday.Id
             where matchday.DivisionSeasonId == divisionSeasonId
+                && matchday.Kind == MatchdayKind.League
                 && fixture.Status == FixtureStatus.Published
                 && (matchEvent.Type == MatchEventType.Goal
                     || matchEvent.Type == MatchEventType.PenaltyGoal

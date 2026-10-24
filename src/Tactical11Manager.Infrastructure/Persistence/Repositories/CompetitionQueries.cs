@@ -481,14 +481,17 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             return null;
         }
 
+        // Every matchday of the season the club plays in, not only its own league's: a play-off final is hosted in the
+        // higher league's division-season, so the visiting club's match is not in the one it finished the season in (PR-4).
         var rows = await (
             from fixture in _dbContext.Fixtures
             join matchday in _dbContext.Matchdays on fixture.MatchdayId equals matchday.Id
+            join matchdaySeason in _dbContext.DivisionSeasons on matchday.DivisionSeasonId equals matchdaySeason.Id
             join home in _dbContext.Clubs on fixture.HomeClubId equals home.Id
             join away in _dbContext.Clubs on fixture.AwayClubId equals away.Id
-            where matchday.DivisionSeasonId == entry.DivisionSeason.Id
+            where matchdaySeason.SeasonId == season.SeasonId
                 && (fixture.HomeClubId == clubId || fixture.AwayClubId == clubId)
-            orderby matchday.RoundNumber
+            orderby fixture.KickoffAt, matchday.RoundNumber
             select new { Fixture = fixture, Matchday = matchday, Home = home, Away = away })
             .ToListAsync(cancellationToken);
 
