@@ -17,10 +17,13 @@ the rule reference in [`game-rules.md`](game-rules.md) is given.
 | **Season** | One full competitive cycle in a country: 30 matchdays of double round-robin play, followed by a rollover of nine days that completes a fixed 11-week cycle (`CAL-1`, `CAL-6`). |
 | **Game year** | The in-fiction year. Advances by exactly one at season rollover. Player aging and contract years follow the game year, not real elapsed time (`TIME-3`). |
 | **Rollover** | The resumable workflow between seasons that finalizes standings, applies promotion/relegation, settles money and awards, expires and renews contracts, ages players, moves clubs, and generates the next schedule. |
-| **Matchday** | A single round (1–30) of a division-season: eight fixtures played at one kickoff instant, locking 30 minutes earlier, publishing as an atomic unit (`CAL-10`, `MAT-7`). |
+| **Matchday** | A single round (1–30, or 31–33 for a promotion play-off match hosted in the division-season) of a division-season: eight fixtures played at one kickoff instant, locking 30 minutes earlier, publishing as an atomic unit (`CAL-10`, `MAT-7`). |
 | **Fixture** | One scheduled match between a home club and an away club inside a matchday. A fixture owns its lock time, status lifecycle, team sheets, input snapshot, and result. |
 | **Schedule** | The generated fixture list for a division-season: 30 rounds produced by a circle/Berger algorithm and mirrored, validated for the properties in `CAL-9`. |
 | **League table / standings** | The transactional projection of published fixtures into played/won/drawn/lost, goals, points, cards, and rank, ordered by `TBL-2` … `TBL-10`. Exactly rebuildable (`TBL-13`). |
+| **Promotion play-off** | The single matches that decide a third promotion place when a lower league has one league above it: a semi-final between the lower league's 3rd (home) and 4th, then a final between the upper league's 14th (home) and the semi-final winner. A draw goes to a penalty shoot-out. Played on days 70, 72 and 75 of the season cycle, after matchday 30; the rollover waits for it (`PR-11`…`PR-17`, ADR-0087). |
+| **Feeder league** | The league directly below another in the pyramid, whose top clubs go up into it. Today every league has at most one feeder; the league above it is its parent. |
+| **Penalty shoot-out** | The kicks that settle a drawn play-off match: five each, then sudden death. Run outside the match engine from the match's stored line-ups (`shootout-v1`, `PR-13`). |
 
 ## People and control
 

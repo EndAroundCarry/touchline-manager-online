@@ -184,7 +184,7 @@ The final draw key must be generated before the season, stored, and visible in c
 
 ### 3.6 Promotion and relegation
 
-- If a lower adjacent tier exists, the top three clubs are promoted and the bottom three clubs in the higher tier are relegated.
+- If a lower adjacent tier exists, its first two clubs are promoted and the last two clubs of the higher tier are relegated. A single-match play-off decides a third place: the lower league's 3rd plays its 4th, the winner plays the higher league's 14th at its ground, and if the lower club wins it goes up and the 14th goes down (so two or three clubs move each way). A draw after 90 minutes is settled by a penalty shoot-out outside the match engine. The rollover waits for the play-off (`PR-11`…`PR-17`, ADR-0087).
 - If no lower tier exists, the lowest active tier has no relegation.
 - Promotions/relegations apply to clubs, so the human manager remains with the club.
 - Movement occurs only during season rollover and only after all fixtures, disciplinary updates, finance postings, and table validations are final.

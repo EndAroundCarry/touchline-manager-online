@@ -226,6 +226,45 @@ refuses a division of any other size (`RunSeasonRollover`), so an 18-club world 
 preflight and no resume fixes it. Existing worlds are not migrated (`RULE-4`, ADR-0083): reseed from a fresh
 database (`npm run migrate`, `npm run seed`, nine countries of two tiers of 16 clubs, 288 clubs; ADR-0085).
 
+## Runbook — a promotion play-off match is stuck
+
+**Symptom.** The league season is over but the rollover has not started. `POST /ops/diagnostics/preview-rollover`
+reports `preflight.undecidedPlayoffTies` above zero and no movements (`PR-15`). Either a play-off match was not published
+(`GET /api/v1/admin/matchdays/{id}` shows a dead-lettered resolution or publication job on a round 31 to 33), or a
+semi-final was published too late for the final to find a slot and the tie has no match.
+
+**Who may act.** Operator or admin.
+
+**Prechecks.**
+1. Preview the rollover and read `preflight.undecidedPlayoffTies`. The rollover waits for it by design and the job is not
+   queued, so nothing is dead-lettered on the rollover side.
+2. Find the play-off round: a matchday with `kind` `playoff` (rounds 31 to 33, slots on days 70, 72 and 75).
+3. A dead-lettered round is resumed exactly like any other (**a matchday is stuck**, above): the same resume
+   command, the same `resolve` or `publish` step. Publishing the semi-final decides it, runs the shoot-out when the
+   score is level, and schedules the final in the same transaction; a repeated publication changes nothing.
+
+**Deadline.** A play-off match must be published before **next season's first matchday locks on day 77**, because
+the rollover cannot finish and create that season's rounds until every tie has a winner. Resume it as soon as the
+cause is fixed.
+**A tie with no match.** If the semi-final was published after slot 3's team sheets locked, the final has no slot,
+has no fixture. There is no command that schedules it. Do not edit rows by hand during
+the incident; escalate to a developer with the season id and the tie's id, who will add the final's round in the
+parent league's division-season and the fixture.
+
+**Validation.** `preview-rollover` reports `preflight.undecidedPlayoffTies` of 0 and lists the movements; the scheduler
+queues the rollover on its next pass and it reaches `Completed`.
+
+**Notification.** Managers taking part receive the normal result message ("Play-off semi-final", "Play-off final")
+and, for a semi-final, the message that names the final. No separate notice is sent.
+
+**Rollback / compensation.** None. A decided tie is never changed (`PR-6`).
+
+**Evidence.** The `admin.matchday.resumed` audit row, the play-off tie row and its fixture.
+
+**A late pair.** A pair of leagues with no time left for its play-off (activated after the semi-finals locked) is
+not drawn and exchanges only first and second against fifteenth and sixteenth that season (`PR-16`). That is not a
+fault and needs no action.
+
 ## Runbook — hand a club to the AI
 
 **Symptom.** A manager has asked support to step in, or is unreachable, and their club should be run by the
@@ -439,7 +478,9 @@ not per press.
 
 **Notes.** Time is frozen between steps, so a transient failure is retried at once rather than after a
 backoff, and a lease left by a stopped worker is only reclaimed at the next step (ADR-0049). Stepping past a
-season's deadline materialises the real rollover job, which closes the season and opens the next. A
+season's deadline materialises the real rollover job, which closes the season and opens the next, once the
+season is settled: the clock steps a day at a time through the promotion play-off slots (days 70, 72 and 75) and
+the rollover starts after the last tie is decided (`PR-15`, ADR-0087). A
 season is an 11-week cycle (ADR-0083): 30 matchdays over ten weeks, a nine-day rollover, and the next season's
 first matchday on the same weekday 77 days after the last season's.
 

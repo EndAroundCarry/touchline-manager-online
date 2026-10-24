@@ -1,6 +1,7 @@
 # ADR-0004: Deterministic, versioned match engine
 
 - **Status:** Accepted
+- **Amended by:** [ADR-0087](0087-promotion-play-off.md): a drawn promotion play-off match is decided by a penalty shoot-out that is run outside the engine, from the stored snapshot and statistics, so the engine version, formula hash and golden hashes do not change.
 - **Date:** 2026-09-23
 - **Stage:** 0 (implemented in Stage 5)
 - **Related:** [`../../product/master-plan.md`](../../product/master-plan.md) §8, [ADR-0006](0006-semantic-highlight-keyframes.md)

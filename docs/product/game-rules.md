@@ -98,7 +98,7 @@ release date is null.
 | CAL-3 | Team sheets lock before kickoff | **30 minutes** |
 | CAL-4 | Deadlines are displayed in the manager's time zone; UTC remains authoritative. The zone is a per-manager preference, seeded from the viewer's browser at onboarding and editable afterwards, and the stored value is what every screen renders with (ADR-0036). | — |
 | CAL-5 | The first production season begins on a **configured future Tuesday** with onboarding lead time. It is never derived from deployment time. | — |
-| CAL-6 | Season cycle and rollover period after matchday 30 | A **fixed 11-week cycle**: the next season starts on the same weekday, **77 days** after the first matchday of the last one. Thirty matchdays on Tuesday, Thursday and Sunday fill ten weeks, so the rollover period is **9 days** (never less than 7) and the start weekday never rotates. A season holds exactly 11 weekly finance runs, 11 free-agent batches, 11 fan reviews and 77 training days. |
+| CAL-6 | Season cycle and rollover period after matchday 30 | A **fixed 11-week cycle**: the next season starts on the same weekday, **77 days** after the first matchday of the last one. Thirty matchdays on Tuesday, Thursday and Sunday fill ten weeks, so the rollover period is **9 days** (never less than 7) and the start weekday never rotates. A season holds exactly 11 weekly finance runs, 11 free-agent batches, 11 fan reviews and 77 training days. Three kickoff slots after matchday 30 are kept for the promotion play-off (`PR-12`): **Tuesday on day 70** (semi-finals), **Thursday on day 72** (finals) and **Sunday on day 75** (spare), each at 19:00 UTC. The rollover starts when the last play-off match is decided, and still ends on day 77. |
 | CAL-7 | All six countries share the same real-time cadence. Jobs, data, and standings remain country/division scoped. | — |
 | CAL-8 | Schedules are generated with a tested circle/Berger algorithm and mirrored for the second half. | — |
 | CAL-9 | Schedule validation asserts: exactly 30 fixtures per club; exactly one fixture per club per round; each pair meets once home and once away; home/away streaks acceptable. | — |
@@ -144,21 +144,32 @@ table actually follows.
 
 | Ref | Rule | Value |
 |---|---|---|
-| PR-1 | Promotion and relegation automatically apply between adjacent active tiers | **3 up / 3 down** |
+| PR-1 | Promotion and relegation automatically apply between adjacent active tiers: the first two of the lower league go up and the last two of the upper league go down, and a play-off (`PR-11`) decides a third place. | **2 up / 2 down directly**, plus a play-off for a third place: **2 or 3 clubs each way**, and always 16 to a league |
 | PR-2 | The lowest active tier has no relegation. | — |
 | PR-3 | Movement applies to **clubs**, so a human manager stays with the club. | — |
-| PR-4 | Movement occurs only during season rollover, and only after all fixtures, discipline, finance postings, and table validations are final. | — |
+| PR-4 | Movement occurs only during season rollover, and only after all fixtures (the play-off's included), discipline, finance postings, and table validations are final. The play-off bracket is drawn when the leagues' last rounds are published (`PR-11`). | — |
 | PR-5 | All movements in a country are applied in one country-scoped serializable transaction, followed by creation of the next season's entries and fixtures. | — |
-| PR-6 | Season-entry and history rows are immutable. A prior season's division membership is never rewritten. | — |
+| PR-6 | Season-entry and history rows are immutable. A prior season's division membership is never rewritten, and a decided play-off tie (winner, how it was decided, shoot-out) is never changed. | — |
 | PR-7 | Promoted/relegated clubs retain squad, contracts, cash, and history. | — |
 | PR-8 | If a tier was provisioned during the closing season, it takes part in promotion/relegation at that rollover (subject to `PR-2`). | — |
 | PR-9 | There is no promotion out of the **top active tier** of a country; there is no higher division to promote into. | — |
 | PR-10 | A country with only one active tier therefore has neither promotion nor relegation in that tier until a lower tier exists. | — |
+| PR-11 | **The bracket.** When a league has one feeder league below it, a **semi-final** is played by the feeder's **3rd (home) and 4th**, and a **final** by the upper league's **14th (home) and the semi-final winner**. If the feeder's club wins the final it goes up and the 14th goes down; otherwise nobody else moves. The two ties are created together when the bracket is drawn, in the publication of the second league's matchday 30 of the pair, with an inbox message to each manager taking part and a news item. A league with no feeder, and a country with one tier, have no bracket. | semi-final 3rd v 4th; final 14th v winner |
+| PR-12 | **A single match, at the better-placed club's ground.** Each tie is one match, played on a play-off matchday that belongs to its host's division-season, as rounds 31 to 33 (`CAL-6` slots 1 to 3). The semi-final is in the feeder league's slot 1 and the final in the upper league's slot 2. If the final cannot take slot 2 because the semi-final was published late, it takes slot 3; if no slot is left the tie stays undecided and an operator acts (runbook). The visiting club sees the match in its fixtures, calendar and dashboard. | slots day 70, 72, 75 |
+| PR-13 | **A draw after 90 minutes goes to a penalty shoot-out**, decided outside the match engine from the match's stored line-ups, so the same published match always gives the same shoot-out. Players on the pitch at full time take the kicks (started or came on, and not substituted off, sent off or injured), best finisher first and the goalkeeper last; each kick reads the taker's finishing and composure against the keeper's reflexes; five kicks each, stopping once one side cannot catch up, then sudden death. A side with fewer players makes the other drop its weakest takers to the same number. The score and every kick are stored and shown on the match page after the result is revealed. | 5 kicks each; `shootout-v1` |
+| PR-14 | **What a play-off match leaves alone.** It is not a league match: it does not change a league table (`TBL-13`), a player's season statistics or the league's television, sponsor and wage postings (`FIN-4`, `FIN-7`, so a season stays 30 parts). **What it does:** the gate and the snack bar go to the host (`FIN-3`, `STRC-4`); the fans of each club move at its own tier (`FAN-5`); cards and suspensions go to each club's own league (`DIS-5`); injuries, fatigue, morale and experience are as in any match. Result messages and news carry the stage, "Play-off semi-final" or "Play-off final", instead of a round number. | — |
+| PR-15 | **The rollover waits.** The rollover is queued once the season is **settled**: every matchday of it published and no play-off tie without a winner. Until then the season's clock moves a day at a time. A final's loser is relegated for every consumer (standing, parachute, wage clause, fans) and its winner promoted. | — |
+| PR-16 | **A late pair plays direct moves only.** If a pair of leagues has no time for its play-off (the first slot's team sheets have already locked when the pair could be drawn, as for a league activated after the semi-finals lock, or a world already past matchday 30 when the play-off was introduced), nothing is drawn and that season the pair exchanges only 1st and 2nd against 15th and 16th. | — |
+| PR-17 | **One league to a tier, for now.** A country does not open a second league in a tier (such as 2.2) until promotion can run over a tree of leagues: a country that needs room opens the next tier's first league (3.1) instead. A tier holding two leagues, or a league with two feeders, is not moved by the rollover and fails its preflight with a clear reason. | `one_league_per_tier` = true |
 
-Movement is computed by a pure, versioned rule (`promotion-relegation-v1`) from each active tier's finalized
-ordering. Three up and three down between every adjacent pair of active tiers means the top tier promotes
-nobody and the lowest relegates nobody as consequences of there being no adjacent tier rather than as special
-cases, and a club moves at most one tier. It is applied once, at rollover, by the world-scoped resumable state
+Movement is computed by a pure, versioned rule (`promotion-relegation-v2`) from each active league's finalized
+ordering and the season's decided play-off ties. Two direct places each way between every adjacent pair of
+leagues, and a play-off for a third, means the top tier promotes nobody and the lowest relegates nobody as
+consequences of there being no adjacent tier rather than as special cases, and a club moves at most one tier.
+Every movement records the league it left, the league it joined and its route (direct or play-off). The table
+page names the zones in words, not colour alone: **Promotion** (1st and 2nd), **Play-off** (3rd and 4th of a
+league with a parent, 14th of a league with a feeder) and **Relegation** (15th and 16th of a league with a
+feeder). It is applied once, at rollover, by the world-scoped resumable state
 machine in [ADR-0031](../architecture/adr/0031-season-rollover-state-machine.md): the season it closes and the
 season it opens are distinct rows, so a finished season's membership, results, and table are never rewritten
 (`PR-6`), and the movement a finished season earned is reproducible from its stored standings.
@@ -304,7 +315,7 @@ Contracts and transfers are the remaining `TRN-13` inputs and arrive with the st
 | DIS-2 | League yellow cards trigger a suspension | **5 yellows → 1 match** |
 | DIS-3 | Yellow accumulation resets at season rollover. | — |
 | DIS-4 | A red card produces a suspension | **1 match** in MVP rules |
-| DIS-5 | Suspensions are served against the club's **next eligible league fixtures**. | — |
+| DIS-5 | Suspensions are served against the club's **next eligible fixtures**: league matches and promotion play-off matches (`PR-14`). A card in a play-off match is recorded in the club's **own** league, whatever ground it was played on, so a red card in a semi-final is served in the final, or in next season's first match. | — |
 | DIS-6 | If a locked team sheet contains a player who became ineligible, the snapshot builder repairs it deterministically from the bench, then from reserves, using position suitability, condition, ability, and stable player ID tie-breaking. | — |
 | DIS-7 | Every repair is recorded and reported to the affected manager in the inbox. | — |
 | DIS-8 | An outstanding suspension that was not served by season end carries into the next season. | — |
@@ -429,9 +440,10 @@ calibrates the baselines; the shapes below are fixed from this version on.
 **On 16 clubs and 30 matchdays** (ADR-0083) the season's money is the same as on 18 and 34, divided differently:
 
 - A season amount is paid **per matchday** in 30 parts (TV money, sponsor, wages, operating cost) or **per weekly run** in 11 (`season_cycle_weeks`: shop takings, upkeep, free agents, fan review). Season totals did not change; the 11⅓ weekly runs the earlier formula assumed (the real calendar had 12) are now exactly 11.
+- A promotion play-off match (`PR-14`) pays the gate and the snack bar to the host and nothing else: no television, sponsor or wage part, so the 30 parts are unchanged. A play-off match is not a home match of the 15.
 - A club has **15 home matches**, not 17, so ticket prices and the snack bar's spend per spectator were raised 34/30 and the shop's spend per fan per week 34/33, to take what the longer season did.
 - The prize table keeps its shape for 16 places (a straight line from 16th to 3rd, 2nd = 3rd × 1.15, champion = 2nd × 1.20, 140.42 shares a division) with the tier-1 share raised from 300,000 to **340,000**, so the average club still earns about 2.98 million and the champion 6.57 million.
-- Sponsor objectives read their place from the table size: win the league (1st), top 3, top 6, **top half (8th)**, **eleventh (11th, replacing twelfth)** and **stay up (13th, the table size less the relegated)**. Standing steps: champion +6, top 3 +4, top 6 +2, **the bottom six places, −2 unless the club went down** (11th to 13th, places above `N − 6`), relegated −5.
+- Sponsor objectives read their place from the table size: win the league (1st), top 3, top 6, **top half (8th)**, **eleventh (11th, replacing twelfth)** and **stay up (13th: the table size less the two relegated and the play-off place, which does not count as staying up)**. Standing steps: champion +6, top 3 +4, top 6 +2, **the bottom six places, −2 unless the club went down** (11th to 13th, places above `N − 6`), relegated −5.
 - The sections above still carry some figures from before the economy rework; the rework's own documentation milestone rewrites them for the 16-club, 30-matchday shape.
 
 ### 13.5 The stadium
@@ -744,8 +756,15 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `max_consecutive_home_or_away` | 4 | CAL-9 |
 | `rollover_days` | 7 (the least the rollover may last; the 11-week cycle makes it 9) | CAL-6 |
 | `points_win` / `points_draw` / `points_loss` | 3 / 1 / 0 | TBL-1 |
-| `promoted_per_tier` / `relegated_per_tier` | 3 / 3 | PR-1 |
-| `promotion_relegation_version` | `promotion-relegation-v1` | PR-1 (FIC-8) |
+| `direct_promotion_places` / `direct_relegation_places` | 2 / 2 | PR-1 |
+| `playoff_semi_home_place` / `playoff_semi_away_place` | 3 / 4 (of the lower league) | PR-11 |
+| `playoff_holder_place` | 14 (`clubs_per_division` less `direct_relegation_places`) | PR-11 |
+| `playoff_slots` | 3 (semi-final slot 1, final slot 2, slot 3 spare); days 70, 72, 75 at 19:00 UTC | PR-12, CAL-6 |
+| `shootout_regulation_kicks` | 5 | PR-13 |
+| `shootout_contest_reference` | 40 (the attribute gap at which a kick's swing applies in full) | PR-13 (balancing) |
+| `one_league_per_tier` | true | PR-17 |
+| `promotion_relegation_version` | `promotion-relegation-v2` | PR-1 (FIC-8) |
+| `shootout_version` | `shootout-v1` | PR-13 (FIC-8) |
 | `squad_target` | 24 | SQ-1 |
 | `squad_min` | 18 | SQ-2 |
 | `squad_min_goalkeepers` | 2 | SQ-2 |
@@ -791,7 +810,7 @@ Values referenced by more than one rule. Changing any value here is a rule chang
 | `training_base_daily_milli` | 436 thousandths of a point (peak age, neutral aptitude, normal intensity) | TRN-10 (balancing) |
 | `training_programme_share_permille` | 600 (the rest, 400, goes equally to the other developing attributes) | TRN-10 (balancing) |
 | `development_limit_headroom` | 2 points above an attribute's formula value | TRN-19 (balancing) |
-| `world_rule_set_version` | `world-rules-v19` | FIC-8 |
+| `world_rule_set_version` | `world-rules-v21` (v20 is reserved for the growing-pyramid plan) | FIC-8 |
 | `match_load_version` | `match-load-v1` | TRN-11, TRN-13 (FIC-8) |
 | `ai_policy_version` | `ai-policy-v1` | INS-12 (FIC-8) |
 | `ai_match_plan_version` | `ai-match-plan-v1` | INS-12, MAT-6 (FIC-8) |

@@ -72,6 +72,7 @@ flowchart LR
         club_season_entries
         matchdays
         fixtures
+        playoff_ties
         standings
         player_season_stats
         club_season_stats
@@ -524,6 +525,8 @@ erDiagram
     division_seasons ||--o{ standings : "tabulates"
     seasons ||--o{ season_rollovers : "closed by"
     matchdays ||--|{ fixtures : "comprises"
+    seasons ||--o{ playoff_ties : "brackets"
+    fixtures ||--o| playoff_ties : "is played as"
     fixtures ||--o| input_snapshots : "freezes"
     fixtures ||--o| matches : "produces"
     matches ||--o{ events : "emits"
@@ -573,7 +576,8 @@ erDiagram
     matchdays {
         uuid id PK
         uuid division_season_id FK
-        smallint round_number "1..30 (1..34 in older worlds)"
+        smallint round_number "1..30 league, 31..33 play-off (1..34 in older worlds)"
+        text kind "league|playoff"
         timestamptz lock_at
         timestamptz kickoff_at
         text publication_status
@@ -614,6 +618,31 @@ erDiagram
         uuid player_id FK
         int yellow_cards
         int red_cards
+        bigint version
+    }
+    playoff_ties {
+        uuid id PK
+        uuid season_id FK
+        uuid country_id FK
+        uuid parent_division_id FK
+        uuid feeder_division_id FK
+        text stage "semi_final|final"
+        smallint slot "1..3"
+        uuid home_club_id FK
+        uuid home_division_id FK
+        smallint home_place
+        uuid away_club_id FK "null until the semi-final is decided"
+        uuid away_division_id FK
+        smallint away_place
+        uuid fixture_id FK "null until scheduled"
+        uuid winner_club_id FK
+        uuid loser_club_id FK
+        text decided_by "score|penalties"
+        smallint shootout_home_score
+        smallint shootout_away_score
+        text shootout_kicks "the kicks, as stored by shootout-v1"
+        timestamptz created_at
+        timestamptz updated_at
         bigint version
     }
     season_rollovers {
@@ -758,7 +787,10 @@ erDiagram
 | `unique (division_id, season_id)` | `division_seasons` | One instance per division per season |
 | `unique (division_season_id, club_id)` | `club_season_entries`, `standings` | One entry and one standing per club |
 | `unique (division_season_id, player_id)`, `check (yellow_cards >= 0 and red_cards >= 0)` | `discipline_records` | One accumulation per player per season (`DIS-2`) |
-| `unique (division_season_id, round_number)` | `matchdays` | 30 rounds (the check allows up to 34, for history) |
+| `unique (division_season_id, round_number)` | `matchdays` | 30 league rounds, plus up to three play-off rounds hosted in the division-season (the check allows up to 34, for history) |
+| `check (kind in ('league', 'playoff'))` | `matchdays` | A round is a league round or a promotion play-off (`PR-12`) |
+| `unique (season_id, parent_division_id, stage, feeder_division_id)` nulls not distinct, `unique (fixture_id)` | `playoff_ties` | One tie per stage of a pair's bracket, and a match belongs to one tie (`PR-11`) |
+| checks on stage, slot 1 to 3, decided by, distinct clubs, the winner and loser being the home or away club, and the shoot-out scores set together and only for a penalty decision | `playoff_ties` | A tie is either waiting or fully decided (`PR-13`) |
 | `check (home_club_id <> away_club_id)` | `fixtures` | A club cannot play itself |
 | `check (home_score >= 0 and away_score >= 0)` | `fixtures` | Nonnegative scores |
 | Score required only when `status in (staged, published)` | `fixtures` | No half-resolved fixtures |
@@ -842,6 +874,15 @@ erDiagram
 > `CountryCapacity.ClubsInCountry`, `HumanOccupiedClubs`). The rule set advances to `world-rules-v19`, the player generator
 > to `player-gen-v4`, the pools to `name-pools-v2` and `player-name-pools-v2`, and the seed's input hash includes
 > `SeededTiers` and `squad-template-v1`. Worlds are not migrated (`RULE-4`). ADR-0085.
+>
+> **Promotion play-off milestone.** One migration, `PromotionPlayoffs`: `competition.matchdays.kind` (`league` by default, `playoff`) and the new
+> `competition.playoff_ties` table (columns and checks above). A play-off matchday is a row of the host's division-season at round 31 to 33,
+> with its own fixture, so gate receipts, team sheets, jobs and resume work unchanged; every league-only read (the table source, the division's
+> match loads and statistic events, the finance rounds played and current matchday ordinal, the AI's rounds published, sponsor counts and
+> back-pay) filters on `kind = 'league'`; a player's match log takes the season's play-off matches as well. The final's away club, fixture and every result column stay empty until the semi-final is decided, and a decided tie is
+> never changed (`PR-6`). The season is *settled* when every matchday is published and no tie lacks a winner; the rollover reads that
+> (`IPlayoffRepository.IsSeasonSettled`). Standings, `season_rollovers` and the season-entry tables are unchanged. The rule set advances to
+> `world-rules-v21` and movement to `promotion-relegation-v2`. ADR-0087.
 >
 > **Stage 12 status (season history).** No schema change: the closed entries are read back as a club's
 > season history and next-season placement (`PR-4`, `PR-6`), and the retained `player_season_stats` rows are

@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Amended by:** [ADR-0085](0085-fair-seeded-squads-and-two-tiers-from-the-first-season.md): a seeded world is nine countries of two tiers of 16, **288 clubs**, not six countries of 16.
+- **Amended by:** [ADR-0087](0087-promotion-play-off.md): promotion and relegation are no longer three up and three down: the first two go up, the last two go down, and a single-match play-off decides a third place (two or three clubs move each way).
 - **Date:** 2026-10-23
 - **Stage:** League size plan (`create-a-plan-based-luminous-cosmos.md`), Milestones 1-8
 - **Related:** [ADR-0005](0005-dynamic-pyramid-and-backfill.md), [ADR-0015](0015-compressed-test-clock.md), [ADR-0031](0031-season-rollover-state-machine.md), [ADR-0049](0049-non-production-stepped-game-clock.md), [ADR-0057](0057-training-programmes-age-curve-and-hidden-aptitude.md), [ADR-0078](0078-fan-base-satisfaction-and-the-crowd.md), [ADR-0080](0080-club-structures-snack-bar-and-merchandise-shop.md), [ADR-0081](0081-every-attribute-develops-to-a-limit-set-by-potential.md), game-rules `WORLD-4`, `PYR-2`, `PYR-4`, `PYR-8`, `CAL-1`, `CAL-6`, `CAL-9`, `MAT-7`, `TRN-10`, `TRN-16`, `CON-3`, `FAN-5`, `FAN-6`, `FAN-8`

@@ -113,3 +113,4 @@ the system is shaped the way it is.
 | [0083](0083-sixteen-clubs-and-thirty-matchdays.md) | Divisions hold 16 clubs and a season 30 matchdays on a fixed 11-week cycle; the money, training and fans are retuned so a season is worth what it was | Accepted |
 | [0085](0085-fair-seeded-squads-and-two-tiers-from-the-first-season.md) | Seeded squads are a fair template, tier 2 is seeded with tier 1, a manager may take a club in any active tier, and Belgium, Portugal and the Netherlands join | Accepted |
 | [0086](0086-matchday-publications-take-turns.md) | Matchday publications take turns behind a lock held before their serializable transaction, and a job that hits a serialization failure or a deadlock is run again at once | Accepted |
+| [0087](0087-promotion-play-off.md) | Promotion is two up, two down and a single-match play-off for the third place, with a penalty shoot-out outside the match engine; the rollover waits for it | Accepted |

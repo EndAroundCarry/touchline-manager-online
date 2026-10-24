@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Amended by:** [ADR-0083](0083-sixteen-clubs-and-thirty-matchdays.md): the rollover refuses a division that is not 16 clubs, and it lasts until the same weekday 77 days after the season began (nine days), not seven days after the last matchday.
+- **Amended by:** [ADR-0087](0087-promotion-play-off.md): the rollover is enqueued only once the season is settled (every matchday published, no play-off tie undecided), movement is computed from the league tables and the play-off outcomes (`promotion-relegation-v2`), and an undecided tie is a transient preflight failure.
 - **Date:** 2026-09-29
 - **Stage:** 12
 - **Related:** [ADR-0003](0003-postgresql-durable-jobs.md), [ADR-0005](0005-dynamic-pyramid-and-backfill.md), [ADR-0009](0009-time-identity-and-concurrency.md), [ADR-0010](0010-club-takeover-serialisation.md), [ADR-0021](0021-competition-rules-and-visible-draw.md), [ADR-0030](0030-provisioning-execution-and-bootstrap-provenance.md), game rules `PR-1`–`PR-10`, `CAL-6`, `TIME-3`, master plan §3.6, §7.5, §16 Stage 12
