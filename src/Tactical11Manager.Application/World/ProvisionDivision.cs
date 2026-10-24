@@ -8,6 +8,7 @@ using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Comms;
 using Tactical11Manager.Application.Competition;
+using Tactical11Manager.Application.Competition.Playoffs;
 using Tactical11Manager.Application.Squad;
 using Tactical11Manager.Application.World.Generation;
 using Tactical11Manager.Domain.Rules;
@@ -76,6 +77,7 @@ public sealed partial class ProvisionDivision
     private readonly ResolveMatchday _resolve;
     private readonly PublishMatchday _publish;
     private readonly RebuildDivisionProjections _rebuild;
+    private readonly PlayoffDraw _playoffDraw;
     private readonly IOnboardingQueries _queries;
     private readonly IRosterQueries _roster;
     private readonly IAdvisoryLock _locks;
@@ -99,6 +101,7 @@ public sealed partial class ProvisionDivision
         ResolveMatchday resolve,
         PublishMatchday publish,
         RebuildDivisionProjections rebuild,
+        PlayoffDraw playoffDraw,
         IOnboardingQueries queries,
         IRosterQueries roster,
         IAdvisoryLock locks,
@@ -120,6 +123,7 @@ public sealed partial class ProvisionDivision
         _resolve = resolve;
         _publish = publish;
         _rebuild = rebuild;
+        _playoffDraw = playoffDraw;
         _queries = queries;
         _roster = roster;
         _locks = locks;
@@ -356,6 +360,10 @@ public sealed partial class ProvisionDivision
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
+
+        // A league that comes up after the season's last matchday but before the semi-final locks is owed its play-off, which only an
+        // active league can be drawn into, so the catch-up runs now that it is active (PR-4). Idempotent, and a no-op when it is too late.
+        await _playoffDraw.CatchUpAsync(cancellationToken);
 
         LogCompleted(countryId, targetTier, targetLeague, clubs, backfilled);
 

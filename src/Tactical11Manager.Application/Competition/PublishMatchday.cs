@@ -4,6 +4,7 @@ using Tactical11Manager.Application.Abstractions.Persistence;
 using Tactical11Manager.Application.Abstractions.Squad;
 using Tactical11Manager.Application.Abstractions.World;
 using Tactical11Manager.Application.Comms;
+using Tactical11Manager.Application.Competition.Playoffs;
 using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Match;
@@ -85,6 +86,8 @@ public sealed class PublishMatchday
     private readonly MatchdayNotifications _notifications;
     private readonly MatchdayFinances _finances;
     private readonly MatchdayFans _fans;
+    private readonly PlayoffDraw _playoffDraw;
+    private readonly PlayoffProgression _playoffProgression;
     private readonly IAdvisoryLock _locks;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
@@ -97,6 +100,8 @@ public sealed class PublishMatchday
         MatchdayNotifications notifications,
         MatchdayFinances finances,
         MatchdayFans fans,
+        PlayoffDraw playoffDraw,
+        PlayoffProgression playoffProgression,
         IAdvisoryLock locks,
         IUnitOfWork unitOfWork,
         IClock clock)
@@ -107,6 +112,8 @@ public sealed class PublishMatchday
         _notifications = notifications;
         _finances = finances;
         _fans = fans;
+        _playoffDraw = playoffDraw;
+        _playoffProgression = playoffProgression;
         _locks = locks;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -159,6 +166,15 @@ public sealed class PublishMatchday
         // rebuild sees. Reading the table's inputs before that would rank a division missing its own round.
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        if (workload.Matchday.Kind == MatchdayKind.Playoff)
+        {
+            await PublishPlayoffAsync(workload, published, now, cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+
+            return new PublishMatchdayResult(PublishMatchdayOutcome.Published, published.Count, 0);
+        }
+
         var positions = await RebuildTableAsync(workload.Matchday.DivisionSeasonId, now, cancellationToken);
 
         // The gate and the snack bar are drawn by the fans going into the round, and staged in this transaction
@@ -187,7 +203,13 @@ public sealed class PublishMatchday
             now,
             cancellationToken);
 
-        var effects = await ApplyEffectsAsync(workload, published, now, cancellationToken);
+        var effects = await ApplyEffectsAsync(
+            workload,
+            published,
+            now,
+            _ => workload.Matchday.DivisionSeasonId,
+            leagueRound: true,
+            cancellationToken);
 
         // Written in the same transaction as the results, so the round and the news of it become public
         // together: a message about a result nobody can read yet would be the same defect as a leaked score.
@@ -205,9 +227,75 @@ public sealed class PublishMatchday
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        // The league season ends here: once both leagues of a pair have published their last round, the play-off is drawn in the same
+        // transaction, so the semi-final exists the moment the table is final (PR-4).
+        if (workload.Matchday.RoundNumber == WorldRuleSet.MatchdaysPerSeason)
+        {
+            await _playoffDraw.EnsureForDivisionAsync(workload.SeasonId, workload.DivisionId, now, cancellationToken);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
         await transaction.CommitAsync(cancellationToken);
 
         return new PublishMatchdayResult(PublishMatchdayOutcome.Published, published.Count, positions.Count);
+    }
+
+    /// <summary>
+    /// Publishes a promotion play-off round (`PR-4`): the gate and the snack bar to the host, the fans of both clubs, cards, injuries and
+    /// the match's load, and then the tie's decision.
+    /// </summary>
+    /// <remarks>
+    /// A play-off match is outside the league: no table is rebuilt, no season statistics move, and no television money, sponsor money or
+    /// wages are posted, so the league's thirty equal parts stay thirty. Each club's fans and cards are its own league's, because the
+    /// host's division-season is the league of only one of the two clubs.
+    /// </remarks>
+    private async Task PublishPlayoffAsync(
+        MatchdayWorkload workload,
+        List<Fixture> published,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await _finances.PostMatchdayTakingsAsync(workload.Matchday.Id, published, now, cancellationToken);
+
+        var placements = (await _matchdays.LoadClubPlacementsAsync(
+                workload.SeasonId,
+                [.. published.SelectMany(fixture => new[] { fixture.HomeClubId, fixture.AwayClubId }).Distinct()],
+                cancellationToken))
+            .ToDictionary(placement => placement.ClubId);
+
+        await _fans.ApplyAsync(
+            workload.SeasonId,
+            placements.ToDictionary(entry => entry.Key, entry => entry.Value.Tier),
+            published,
+            now,
+            cancellationToken);
+
+        var effects = await ApplyEffectsAsync(
+            workload,
+            published,
+            now,
+            clubId => placements[clubId].DivisionSeasonId,
+            leagueRound: false,
+            cancellationToken);
+
+        // A fixture is published before it is decided, so the decision reads the match as the league would: from what was stored.
+        var decision = await _playoffProgression.DecideAsync(workload, published[0], now, cancellationToken);
+
+        await _notifications.NotifyPublishedAsync(
+            workload.Matchday.RoundNumber,
+            workload.WorldId,
+            workload.DivisionId,
+            PlayedFacts(published),
+            [],
+            effects,
+            now,
+            cancellationToken,
+            decision);
+
+        workload.Matchday.Publish(now);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     private static IReadOnlyList<PlayedFixtureFact> PlayedFacts(IReadOnlyList<Fixture> published) =>
@@ -245,6 +333,8 @@ public sealed class PublishMatchday
         MatchdayWorkload workload,
         List<Fixture> published,
         DateTimeOffset now,
+        Func<Guid, Guid> divisionSeasonOf,
+        bool leagueRound,
         CancellationToken cancellationToken)
     {
         if (published.Count == 0)
@@ -268,7 +358,7 @@ public sealed class PublishMatchday
             await _matchdays.LoadMatchEffectsAsync(workload.Matchday.Id, cancellationToken));
 
         var facts = effects.Count > 0
-            ? await ApplyDisciplineAsync(workload, effects, now, cancellationToken)
+            ? await ApplyDisciplineAsync(effects, divisionSeasonOf, now, cancellationToken)
             : [];
 
         // The round's results are read once and feed both the load and the season statistics: the load
@@ -277,7 +367,12 @@ public sealed class PublishMatchday
         var played = await _matchdays.LoadMatchLoadsAsync(workload.Matchday.Id, cancellationToken);
 
         await ApplyMatchLoadAsync(played, cancellationToken);
-        await ApplySeasonStatisticsAsync(workload.Matchday, played, now, cancellationToken);
+
+        // A play-off match is outside the league's statistics, as it is outside its table (PR-4).
+        if (leagueRound)
+        {
+            await ApplySeasonStatisticsAsync(workload.Matchday, played, now, cancellationToken);
+        }
 
         return facts;
     }
@@ -353,18 +448,25 @@ public sealed class PublishMatchday
     /// </summary>
     /// <returns>One fact per affected player, naming the suspension and injury the round produced.</returns>
     private async Task<IReadOnlyList<PlayerEffectFact>> ApplyDisciplineAsync(
-        MatchdayWorkload workload,
         IReadOnlyList<MatchPlayerEffect> effects,
+        Func<Guid, Guid> divisionSeasonOf,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var playerIds = effects.Select(effect => effect.PlayerId).Distinct().ToList();
+        // Each card goes to the division-season of the player's own club. In a league round that is the round's; in a play-off match the
+        // host's division-season is the league of only one of the two clubs, so a visitor's cards stay in its own league's record.
+        var records = new Dictionary<Guid, DisciplineRecord>();
 
-        var records = (await _matchdays.LoadDisciplineAsync(
-                workload.Matchday.DivisionSeasonId,
-                playerIds,
+        foreach (var group in effects.GroupBy(effect => divisionSeasonOf(effect.ClubId)))
+        {
+            foreach (var record in await _matchdays.LoadDisciplineAsync(
+                group.Key,
+                [.. group.Select(effect => effect.PlayerId).Distinct()],
                 cancellationToken))
-            .ToDictionary(record => record.PlayerId);
+            {
+                records[record.PlayerId] = record;
+            }
+        }
 
         var facts = new List<PlayerEffectFact>(effects.Count);
 
@@ -379,7 +481,7 @@ public sealed class PublishMatchday
                 {
                     record = DisciplineRecord.Open(
                         Guid.CreateVersion7(),
-                        workload.Matchday.DivisionSeasonId,
+                        divisionSeasonOf(effect.ClubId),
                         effect.PlayerId,
                         now);
 

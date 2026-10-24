@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Tactical11Manager.Domain.Comms;
+using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Squad;
 
 namespace Tactical11Manager.Application.Comms;
@@ -86,6 +87,9 @@ public static class InboxTemplates
 
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
+    /// <summary>The stored code for a movement earned in the promotion play-off; an older message has none.</summary>
+    internal const string PlayoffRoute = "playoff";
+
     /// <summary>Builds the message a club's result in a round produces.</summary>
     /// <param name="roundNumber">The round, 1–30.</param>
     /// <param name="opponentName">The opponent's generated name.</param>
@@ -108,6 +112,43 @@ public static class InboxTemplates
             InboxCategory.Result,
             ResultRecorded,
             new ResultParameters(roundNumber, opponentName, isHome, goalsFor, goalsAgainst, outcome, position),
+            matchId);
+
+    /// <summary>Builds the message a club's result in a promotion play-off match produces (`PR-4`).</summary>
+    /// <param name="stage">The match's stage, which the headline names instead of a round.</param>
+    /// <param name="opponentName">The opponent's generated name.</param>
+    /// <param name="isHome">Whether the club hosted.</param>
+    /// <param name="goalsFor">The club's goals in the 90 minutes.</param>
+    /// <param name="goalsAgainst">The opponent's goals in the 90 minutes.</param>
+    /// <param name="shootoutFor">The club's penalties scored, when the tie went to a shoot-out.</param>
+    /// <param name="shootoutAgainst">The opponent's penalties scored, when the tie went to a shoot-out.</param>
+    /// <param name="fate">What the result meant for the club, one of <see cref="PlayoffFates"/>.</param>
+    /// <param name="matchId">The played match, which the message links to.</param>
+    public static InboxDraft PlayoffResult(
+        PlayoffStage stage,
+        string opponentName,
+        bool isHome,
+        int goalsFor,
+        int goalsAgainst,
+        int? shootoutFor,
+        int? shootoutAgainst,
+        string fate,
+        Guid matchId) =>
+        Write(
+            InboxCategory.Result,
+            ResultRecorded,
+            new ResultParameters(
+                0,
+                opponentName,
+                isHome,
+                goalsFor,
+                goalsAgainst,
+                goalsFor > goalsAgainst ? WinOutcome : goalsFor < goalsAgainst ? LossOutcome : DrawOutcome,
+                0,
+                stage.ToCode(),
+                shootoutFor,
+                shootoutAgainst,
+                fate),
             matchId);
 
     /// <summary>Builds the message a club's changed league position produces.</summary>
@@ -175,17 +216,24 @@ public static class InboxTemplates
     /// <param name="fromDivision">The division it left.</param>
     /// <param name="toDivision">The division it joined.</param>
     /// <param name="promoted">True when the club went up, false when it came down.</param>
+    /// <param name="route">How the club earned the move; a play-off is told as such, the table needs no mention.</param>
     public static InboxDraft Movement(
         string clubName,
         string fromDivision,
         string toDivision,
-        bool promoted) =>
+        bool promoted,
+        MovementRoute route = MovementRoute.Direct) =>
         Write(
             // A movement is the season's final table event, so it sits on the table shelf rather than adding
             // a category (and a check-constraint migration) for one message.
             InboxCategory.Table,
             SeasonMovement,
-            new MovementParameters(clubName, fromDivision, toDivision, promoted),
+            new MovementParameters(
+                clubName,
+                fromDivision,
+                toDivision,
+                promoted,
+                route == MovementRoute.Playoff ? PlayoffRoute : null),
             relatedEntityId: null);
 
     /// <summary>Builds the message a repaired side produces (`DIS-7`).</summary>
@@ -267,7 +315,11 @@ public static class InboxTemplates
         int GoalsFor,
         int GoalsAgainst,
         string Outcome,
-        int Position);
+        int Position,
+        string? Stage = null,
+        int? ShootoutFor = null,
+        int? ShootoutAgainst = null,
+        string? Fate = null);
 
     internal sealed record TableParameters(int RoundNumber, int Position, int PreviousPosition);
 
@@ -283,7 +335,8 @@ public static class InboxTemplates
         string ClubName,
         string FromDivision,
         string ToDivision,
-        bool Promoted);
+        bool Promoted,
+        string? Route = null);
 
     internal sealed record TeamSheetParameters(int RoundNumber, IReadOnlyList<RepairParameter> Repairs);
 

@@ -666,11 +666,13 @@ internal sealed record RolloverDivisionResponse(
 /// <param name="Reconciles">Whether every division-season reconciles with its published results.</param>
 /// <param name="Problem">Why the plan could not be read at all, when it could not.</param>
 /// <param name="Divisions">The per-division reconciliation reads.</param>
+/// <param name="UndecidedPlayoffTies">Play-off ties of the closing season that have no winner yet.</param>
 internal sealed record RolloverPreflightResponse(
     int UnpublishedMatchdays,
     bool Reconciles,
     string? Problem,
-    IReadOnlyList<RolloverDivisionResponse> Divisions);
+    IReadOnlyList<RolloverDivisionResponse> Divisions,
+    int UndecidedPlayoffTies);
 
 /// <summary>The totals a previewed rollover would produce.</summary>
 /// <param name="Countries">How many countries would move.</param>
@@ -734,7 +736,8 @@ internal sealed record RolloverPreviewResponse(
                         division.Outcome,
                         division.StandingsDrifted,
                         division.PlayerStatsDrifted))
-                    .ToList()),
+                    .ToList(),
+                preview.Preflight.UndecidedPlayoffTies),
             preview.NextSeasonExists,
             preview.Countries
                 .Select(country => new RolloverCountryResponse(

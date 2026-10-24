@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Tactical11Manager.Application.Abstractions;
 using Tactical11Manager.Application.Abstractions.Competition;
 using Tactical11Manager.Application.Abstractions.Jobs;
+using Tactical11Manager.Application.Competition.Playoffs;
 using Tactical11Manager.Application.Jobs;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Infrastructure.Persistence;
@@ -25,10 +26,10 @@ namespace Tactical11Manager.Infrastructure.Competition;
 /// (ADR-0003).
 /// </para>
 /// <para>
-/// Whether the season was actually <em>finished</em> — every matchday published and every projection
-/// reconciled — is preflight's business, in the worker, not this materialiser's: a rollover enqueued a few
-/// seconds before the last publication completes is a transient failure the job retries, which is a cheaper
-/// arrangement than a materialiser that polls a whole season's publication state every pass.
+/// The season's end is matchday 30's kickoff, but the season is not finished then: the promotion play-off is played on the days after,
+/// and the rollover must follow its last match (ADR-0087). The job is therefore queued only once the season is <em>settled</em> — every
+/// matchday of every league published, play-off rounds included, and no tie without a winner. Projection reconciliation stays
+/// preflight's business in the worker; a rollover that still meets an unplayed round there is a transient failure the job retries.
 /// </para>
 /// <para>
 /// Worker-only, like the other schedulers: a season closes as a consequence of play, never of a client
@@ -125,6 +126,27 @@ internal sealed partial class SeasonRolloverScheduler : BackgroundService, IJobM
             return;
         }
 
+        // A league that was activated after the last matchday is owed its play-off while the semi-final can still be scheduled. The pass
+        // is idempotent and cheap once nothing is owed, and a failure to draw must not stop the rollover from being queued (PR-4).
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<PlayoffDraw>().CatchUpAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            LogDrawFailed(exception);
+        }
+
+        // The rollover follows the last play-off: it is not queued while a round is unpublished or a tie has no winner, so the job never
+        // starts on a season that is still being played (PR-4). A later pass queues it once the season is settled.
+        var settled = await scope.ServiceProvider.GetRequiredService<IPlayoffRepository>()
+            .IsSeasonSettledAsync(season.Id, cancellationToken);
+
+        if (!settled)
+        {
+            return;
+        }
+
         var inserted = await queue.EnqueueAsync(
             new JobEnqueueRequest
             {
@@ -158,6 +180,12 @@ internal sealed partial class SeasonRolloverScheduler : BackgroundService, IJobM
         Level = LogLevel.Information,
         Message = "Materialised the rollover of season {SeasonId} ({Label}) (PR-4).")]
     private partial void LogScheduled(Guid seasonId, string label);
+
+    [LoggerMessage(
+        EventId = 3404,
+        Level = LogLevel.Error,
+        Message = "The season-rollover scheduler failed to catch up the promotion play-off draw (PR-4).")]
+    private partial void LogDrawFailed(Exception exception);
 
     [LoggerMessage(
         EventId = 3403,

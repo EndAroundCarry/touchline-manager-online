@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Tactical11Manager.Application.Comms;
 using Tactical11Manager.Application.Match;
+using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Squad;
 
 namespace Tactical11Manager.Application.Tests.Comms;
@@ -184,6 +185,31 @@ public sealed class InboxMessageTextTests
 
         relegatedText.Title.Should().Be("Relegated to England Division 2");
         relegatedText.Body.Should().Contain("Bramford Rovers").And.Contain("England Division 2");
+    }
+
+    [Fact]
+    public void A_season_movement_earned_in_the_play_off_says_so_for_the_winner_and_the_loser()
+    {
+        var promoted = InboxTemplates.Movement("Vale Athletic", "Second Division", "First Division", promoted: true, MovementRoute.Playoff);
+        var relegated = InboxTemplates.Movement("Bramford Rovers", "First Division", "Second Division", promoted: false, MovementRoute.Playoff);
+
+        var promotedText = InboxMessageText.Render(promoted.TemplateKey, promoted.ParametersJson);
+        var relegatedText = InboxMessageText.Render(relegated.TemplateKey, relegated.ParametersJson);
+
+        promotedText.Title.Should().Be("Promoted to First Division");
+        promotedText.Body.Should().Be("Vale Athletic won the play-off final and goes up to First Division from Second Division.");
+        relegatedText.Title.Should().Be("Relegated to Second Division");
+        relegatedText.Body.Should().Be("Bramford Rovers lost the play-off final and goes down to Second Division from First Division.");
+    }
+
+    [Fact]
+    public void A_season_movement_stored_before_the_play_off_still_renders_as_a_table_finish()
+    {
+        const string stored = """{"clubName":"Vale Athletic","fromDivision":"Second Division","toDivision":"First Division","promoted":true}""";
+
+        var text = InboxMessageText.Render(InboxTemplates.SeasonMovement, stored);
+
+        text.Body.Should().Be("Vale Athletic finished in the promotion places and goes up to First Division from Second Division.");
     }
 
     [Fact]

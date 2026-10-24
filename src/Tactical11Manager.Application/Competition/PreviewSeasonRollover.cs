@@ -43,11 +43,13 @@ public sealed record SeasonRolloverDivisionReconciliation(
 /// <param name="Reconciles">Whether every division-season reconciles with its published results.</param>
 /// <param name="Problem">Why the plan could not be read at all, when it could not.</param>
 /// <param name="Divisions">The per-division reconciliation reads.</param>
+/// <param name="UndecidedPlayoffTies">Play-off ties of the closing season that have no winner yet; the rollover waits for them (`PR-4`).</param>
 public sealed record SeasonRolloverPreflight(
     int UnpublishedMatchdays,
     bool Reconciles,
     string? Problem,
-    IReadOnlyList<SeasonRolloverDivisionReconciliation> Divisions);
+    IReadOnlyList<SeasonRolloverDivisionReconciliation> Divisions,
+    int UndecidedPlayoffTies = 0);
 
 /// <summary>The totals a previewed rollover would produce.</summary>
 /// <param name="Countries">How many countries would move.</param>
@@ -94,7 +96,7 @@ public sealed record SeasonRolloverPreview(
 /// <remarks>
 /// <para>
 /// It reads the same plan the rollover machine reads, through the same loader, and computes movement with
-/// the same pure rule (<see cref="PromotionRelegation"/>, `promotion-relegation-v1`) and reconciliation with
+/// the same pure rule (<see cref="PromotionRelegation"/>, `promotion-relegation-v2`) and reconciliation with
 /// the same dry run (`RebuildDivisionProjections`), so the preview cannot describe a rollover the machine
 /// would not run. It writes nothing and takes no transaction or lock (ADR-0020).
 /// </para>
@@ -159,10 +161,23 @@ public sealed class PreviewSeasonRollover
             return Empty(world, season, rollover, nextSeason is not null, exception.Message);
         }
 
+        var problems = plan.Countries
+            .SelectMany(country => SeasonRolloverPlanLoader.ProblemsOf(country).Select(problem => $"{country.Code}: {problem}"))
+            .ToList();
+
+        if (problems.Count > 0)
+        {
+            return Empty(world, season, rollover, nextSeason is not null, string.Join("; ", problems));
+        }
+
         var unpublished = await _plans.CountUnpublishedAsync(plan, cancellationToken);
+        var undecided = await _plans.CountUndecidedAsync(season, cancellationToken);
         var reconciliations = await _plans.ReconcileAsync(plan, cancellationToken);
         var reconciles = reconciliations.All(
             reconciliation => reconciliation.Result.Outcome == ProjectionRebuildOutcome.Reconciled);
+
+        // The movements follow the play-off, so they are only worked out once the season has nothing left to play (PR-4).
+        var settled = unpublished == 0 && undecided == 0;
 
         var countries = new List<SeasonRolloverPreviewCountry>(plan.Countries.Count);
         var movements = new List<SeasonRolloverMovement>();
@@ -170,8 +185,7 @@ public sealed class PreviewSeasonRollover
 
         foreach (var country in plan.Countries)
         {
-            var countryMovements = SeasonRolloverPlanLoader
-                .MovementsOf(country)
+            var countryMovements = (settled ? SeasonRolloverPlanLoader.MovementsOf(country) : [])
                 .Select(movement => new SeasonRolloverMovement(
                     movement.ClubId,
                     movement.FromTier,
@@ -202,7 +216,8 @@ public sealed class PreviewSeasonRollover
                     reconciliation.Result.Outcome.ToString(),
                     reconciliation.Result.StandingsDrifted,
                     reconciliation.Result.PlayerStatsDrifted))
-                .ToList());
+                .ToList(),
+            undecided);
 
         var totals = new SeasonRolloverPreviewTotals(
             plan.Countries.Count,
@@ -222,9 +237,9 @@ public sealed class PreviewSeasonRollover
             nextSeason is not null,
             countries,
             totals,
-            // Preflight decides readiness: a season with unpublished rounds or drifted projections would be
+            // Preflight decides readiness: a season with unpublished rounds, an undecided play-off tie or drifted projections would be
             // refused, and a completed rollover has nothing to do (PR-4, TBL-13).
-            unpublished == 0 && reconciles && phase != SeasonRolloverPhase.Completed);
+            settled && reconciles && phase != SeasonRolloverPhase.Completed);
     }
 
     private static long PositionAwards(RolloverCountry country)

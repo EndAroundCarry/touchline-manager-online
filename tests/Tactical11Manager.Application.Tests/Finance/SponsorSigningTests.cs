@@ -467,6 +467,9 @@ public sealed class SponsorSigningTests
         public Task<IReadOnlyDictionary<Guid, FanForm>> GetFormAsync(Guid divisionSeasonId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyDictionary<Guid, FanForm>> GetSeasonFormAsync(Guid seasonId, IReadOnlyCollection<Guid> clubIds, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<int?> GetDivisionTierAsync(Guid divisionId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 

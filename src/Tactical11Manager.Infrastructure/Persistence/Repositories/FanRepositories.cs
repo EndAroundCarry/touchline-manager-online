@@ -149,6 +149,21 @@ internal sealed class FanQueries : IFanQueries
             .ToDictionary(standing => standing.ClubId, standing => new FanForm(standing.Played, standing.Points));
 
     /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<Guid, FanForm>> GetSeasonFormAsync(
+        Guid seasonId,
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken) =>
+        clubIds.Count == 0
+            ? new Dictionary<Guid, FanForm>()
+            : (await (
+                from standing in _dbContext.Standings
+                join divisionSeason in _dbContext.DivisionSeasons on standing.DivisionSeasonId equals divisionSeason.Id
+                where divisionSeason.SeasonId == seasonId && clubIds.Contains(standing.ClubId)
+                select new { standing.ClubId, standing.Played, standing.Points })
+                .ToListAsync(cancellationToken))
+                .ToDictionary(standing => standing.ClubId, standing => new FanForm(standing.Played, standing.Points));
+
+    /// <inheritdoc />
     public Task<int?> GetDivisionTierAsync(Guid divisionId, CancellationToken cancellationToken) =>
         _dbContext.Divisions
             .Where(division => division.Id == divisionId)

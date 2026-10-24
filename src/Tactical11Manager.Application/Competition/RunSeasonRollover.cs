@@ -288,11 +288,27 @@ public sealed partial class RunSeasonRollover
                 $"Season {season.Id} still has {unpublished} unplayed matchdays; the rollover will retry (PR-4).");
         }
 
+        var undecided = await _plans.CountUndecidedAsync(season, cancellationToken);
+
+        if (undecided > 0)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+
+            // A play-off tie is an unplayed match like an unpublished round: transient, and the queue retries (PR-4).
+            throw new InvalidOperationException(
+                $"Season {season.Id} still has {undecided} undecided play-off ties; the rollover will retry (PR-4).");
+        }
+
+        // The leagues must fit the movement rule: a defect in the pyramid's shape, never cured by a retry (PR-1).
+        var problems = plan.Countries
+            .SelectMany(country => SeasonRolloverPlanLoader.ProblemsOf(country).Select(problem => $"{country.Code}: {problem}"))
+            .ToList();
+
         var drift = await _plans.DetectDriftAsync(plan, cancellationToken);
 
-        if (drift.Count > 0)
+        if (problems.Count > 0 || drift.Count > 0)
         {
-            var reason = string.Join("; ", drift);
+            var reason = string.Join("; ", problems.Concat(drift));
 
             rollover.Fail(reason, now);
             RecordAudit(WorldAuditActions.RolloverFailed, rollover.Id, reason);
@@ -302,7 +318,7 @@ public sealed partial class RunSeasonRollover
             LogFailed(reason);
 
             throw new PermanentJobFailureException(
-                $"Season {season.Id} did not reconcile and cannot roll over: {reason} (PR-4, TBL-13).");
+                $"Season {season.Id} cannot roll over: {reason} (PR-1, PR-4, TBL-13).");
         }
 
         if (season.Status == SeasonStatus.Active)
@@ -483,8 +499,9 @@ public sealed partial class RunSeasonRollover
         {
             var movements = SeasonRolloverPlanLoader.MovementsOf(country);
 
+            // Grouped by the league a club plays in next, not by its tier: a tier may one day hold more than one league (PR-5).
             var byDestination = movements
-                .GroupBy(movement => movement.ToTier)
+                .GroupBy(movement => movement.ToDivisionId)
                 .ToDictionary(group => group.Key, group => group.Select(movement => movement.ClubId).ToList());
 
             // The clubs whose tier changed this rollover, so a manager can be told where their club is going
@@ -495,12 +512,12 @@ public sealed partial class RunSeasonRollover
 
             foreach (var tier in country.Tiers)
             {
-                var clubs = byDestination.TryGetValue(tier.TierNumber, out var placed) ? placed : [];
+                var clubs = byDestination.TryGetValue(tier.DivisionId, out var placed) ? placed : [];
 
                 if (clubs.Count != WorldRuleSet.ClubsPerDivision)
                 {
                     throw new InvalidOperationException(
-                        $"Tier {tier.TierNumber} of country {country.Code} would hold {clubs.Count} clubs "
+                        $"Tier {tier.TierNumber} (league {tier.LeagueNumber}) of country {country.Code} would hold {clubs.Count} clubs "
                         + $"instead of {WorldRuleSet.ClubsPerDivision} (PR-1).");
                 }
 
@@ -598,14 +615,15 @@ public sealed partial class RunSeasonRollover
 
             var movement = moved[clubId];
             var fromDivision = country.Tiers
-                .FirstOrDefault(tier => tier.TierNumber == movement.FromTier)?.DivisionDisplayName
+                .FirstOrDefault(tier => tier.DivisionId == movement.FromDivisionId)?.DivisionDisplayName
                 ?? destination.DivisionDisplayName;
 
             var draft = InboxTemplates.Movement(
                 target.Name,
                 fromDivision,
                 destination.DivisionDisplayName,
-                movement.IsPromoted);
+                movement.IsPromoted,
+                movement.Route);
 
             _inbox.Add(InboxMessage.Record(
                 Guid.CreateVersion7(),

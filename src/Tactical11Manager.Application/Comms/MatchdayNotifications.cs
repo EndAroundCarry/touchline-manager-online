@@ -1,5 +1,6 @@
 using Tactical11Manager.Application.Abstractions.Comms;
 using Tactical11Manager.Domain.Comms;
+using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 
@@ -19,6 +20,19 @@ public sealed record PlayedFixtureFact(
     Guid AwayClubId,
     int HomeGoals,
     int AwayGoals);
+
+/// <summary>How a play-off match was decided, as its result messages read it (`PR-4`, `PR-6`).</summary>
+/// <param name="Stage">The match's stage.</param>
+/// <param name="WinnerClubId">The club that goes through.</param>
+/// <param name="HolderClubId">The higher league's club of a final, which stays up if it wins; the home club.</param>
+/// <param name="ShootoutHomeScore">The home side's penalties, when the tie went to a shoot-out.</param>
+/// <param name="ShootoutAwayScore">The away side's penalties, when the tie went to a shoot-out.</param>
+public sealed record PlayoffResultFact(
+    PlayoffStage Stage,
+    Guid WinnerClubId,
+    Guid HolderClubId,
+    int? ShootoutHomeScore,
+    int? ShootoutAwayScore);
 
 /// <summary>One club's league position after a round, with where it was before (`F-41`).</summary>
 /// <param name="ClubId">The club.</param>
@@ -90,6 +104,10 @@ public sealed class MatchdayNotifications
     /// <param name="effects">What the round did to each booked, sent-off, or injured player.</param>
     /// <param name="now">The current instant, taken from the caller's clock (`TIME-2`).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="playoff">
+    /// How the match was decided when the round is a promotion play-off, which names the stage instead of a round and leaves out the table
+    /// position; null for a league round.
+    /// </param>
     public async Task NotifyPublishedAsync(
         int roundNumber,
         Guid worldId,
@@ -98,7 +116,8 @@ public sealed class MatchdayNotifications
         IReadOnlyList<ClubPositionFact> positions,
         IReadOnlyList<PlayerEffectFact> effects,
         DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        PlayoffResultFact? playoff = null)
     {
         ArgumentNullException.ThrowIfNull(played);
         ArgumentNullException.ThrowIfNull(positions);
@@ -133,7 +152,7 @@ public sealed class MatchdayNotifications
             NotifyResult(fixture, fixture.AwayClubId, fixture.HomeClubId, fixture.AwayGoals, fixture.HomeGoals);
 
             // The news feed is public, so it carries the result for everyone, managers or not (COM-1).
-            PostResult(fixture, worldId, divisionId, roundNumber, targets, now);
+            PostResult(fixture, worldId, divisionId, roundNumber, targets, now, playoff);
         }
 
         foreach (var position in positions.OrderBy(position => position.ClubId))
@@ -212,6 +231,29 @@ public sealed class MatchdayNotifications
             var position = positionOf.TryGetValue(clubId, out var clubPosition)
                 ? clubPosition.Position
                 : 0;
+
+            if (playoff is not null)
+            {
+                var won = playoff.WinnerClubId == clubId;
+                var shootoutFor = isHome ? playoff.ShootoutHomeScore : playoff.ShootoutAwayScore;
+                var shootoutAgainst = isHome ? playoff.ShootoutAwayScore : playoff.ShootoutHomeScore;
+
+                _inbox.Add(NewMessage(
+                    managerId,
+                    InboxTemplates.PlayoffResult(
+                        playoff.Stage,
+                        targets[opponentClubId].Name,
+                        isHome,
+                        goalsFor,
+                        goalsAgainst,
+                        shootoutFor,
+                        shootoutAgainst,
+                        PlayoffFates.For(playoff.Stage, clubId == playoff.HolderClubId, won),
+                        fixture.MatchId),
+                    now));
+
+                return;
+            }
 
             _inbox.Add(NewMessage(
                 managerId,
@@ -321,19 +363,31 @@ public sealed class MatchdayNotifications
         Guid divisionId,
         int roundNumber,
         Dictionary<Guid, ClubInboxTarget> targets,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        PlayoffResultFact? playoff)
     {
         var homeName = targets.TryGetValue(fixture.HomeClubId, out var home) ? home.Name : "Home";
         var awayName = targets.TryGetValue(fixture.AwayClubId, out var away) ? away.Name : "Away";
 
-        var draft = NewsTemplates.Round(
-            roundNumber,
-            homeName,
-            fixture.HomeGoals,
-            awayName,
-            fixture.AwayGoals,
-            divisionId,
-            fixture.MatchId);
+        var draft = playoff is null
+            ? NewsTemplates.Round(
+                roundNumber,
+                homeName,
+                fixture.HomeGoals,
+                awayName,
+                fixture.AwayGoals,
+                divisionId,
+                fixture.MatchId)
+            : NewsTemplates.PlayoffRound(
+                playoff.Stage,
+                homeName,
+                fixture.HomeGoals,
+                awayName,
+                fixture.AwayGoals,
+                playoff.ShootoutHomeScore,
+                playoff.ShootoutAwayScore,
+                divisionId,
+                fixture.MatchId);
 
         _news.Add(NewsItem.Publish(
             Guid.CreateVersion7(),

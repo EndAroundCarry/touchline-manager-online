@@ -43,6 +43,19 @@ public sealed class AdvanceGameClockSeasonEndTests
     }
 
     [Fact]
+    public async Task While_a_round_or_a_play_off_tie_is_still_to_be_played_the_matchday_step_is_a_day_and_no_rollover_is_queued()
+    {
+        var jobs = new RecordingJobQueue { RequeueResult = true };
+
+        var result = await Advance(Now, [], jobs, Season(), settled: false).ExecuteAsync("matchday", CancellationToken.None);
+
+        result.Target.Should().Be(ClockJobPayload.Matchday);
+        result.TargetInstantUtc.Should().Be(new DateTimeOffset(2026, 10, 7, 0, 0, 0, TimeSpan.Zero));
+        jobs.Enqueued.Should().ContainSingle().Which.JobType.Should().Be(ClockJobTypes.Advance);
+        jobs.Requeued.Should().BeEmpty("the season is not at its end, so there is no rollover to revive");
+    }
+
+    [Fact]
     public async Task A_rollover_that_was_dead_lettered_goes_back_to_the_queue_instead_of_a_second_job()
     {
         var season = Season();
@@ -136,8 +149,27 @@ public sealed class AdvanceGameClockSeasonEndTests
         return season;
     }
 
-    private static AdvanceGameClock Advance(DateTimeOffset now, DateTimeOffset[] kickoffs, RecordingJobQueue jobs, Season? season) =>
-        new(new FixedClockStore(now), new StubMatchdayRepository(kickoffs), jobs, new StubWorldRepository(season));
+    private static AdvanceGameClock Advance(
+        DateTimeOffset now,
+        DateTimeOffset[] kickoffs,
+        RecordingJobQueue jobs,
+        Season? season,
+        bool settled = true) =>
+        new(new FixedClockStore(now), new StubMatchdayRepository(kickoffs), jobs, new StubWorldRepository(season), new StubPlayoffRepository(settled));
+
+    private sealed class StubPlayoffRepository(bool settled) : IPlayoffRepository
+    {
+        public void Add(PlayoffTie tie) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<PlayoffTie>> ListBySeasonAsync(Guid seasonId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<PlayoffTie?> FindByFixtureAsync(Guid fixtureId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<int> CountUndecidedAsync(Guid seasonId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<bool> IsSeasonSettledAsync(Guid seasonId, CancellationToken cancellationToken) => Task.FromResult(settled);
+    }
 
     private static GetGameClockStatus Status(DateTimeOffset now, DateTimeOffset[] kickoffs, Season? season) =>
         new(new FixedClockStore(now), new StubMatchdayRepository(kickoffs), new StubWorldRepository(season));

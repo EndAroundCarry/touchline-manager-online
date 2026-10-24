@@ -97,6 +97,18 @@ public interface IFanQueries
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<IReadOnlyDictionary<Guid, FanForm>> GetFormAsync(Guid divisionSeasonId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Reads how some clubs have done so far in their own leagues this season, from their published tables. A promotion play-off match
+    /// is played by clubs of two leagues, so each side is read in its own (`FAN-3`).
+    /// </summary>
+    /// <param name="seasonId">The season.</param>
+    /// <param name="clubIds">The clubs.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyDictionary<Guid, FanForm>> GetSeasonFormAsync(
+        Guid seasonId,
+        IReadOnlyCollection<Guid> clubIds,
+        CancellationToken cancellationToken);
+
     /// <summary>Reads the tier of a division.</summary>
     /// <param name="divisionId">The division.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

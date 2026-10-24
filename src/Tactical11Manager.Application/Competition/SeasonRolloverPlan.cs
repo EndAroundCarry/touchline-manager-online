@@ -44,11 +44,13 @@ public sealed record RolloverTier(
 /// <param name="Code">The country's code.</param>
 /// <param name="DisplayName">The country's name.</param>
 /// <param name="Tiers">The country's active tiers, ascending by tier.</param>
+/// <param name="Outcomes">The decided matches of the season's promotion play-off; empty for a country that played none (`PR-4`).</param>
 public sealed record RolloverCountry(
     Guid CountryId,
     string Code,
     string DisplayName,
-    IReadOnlyList<RolloverTier> Tiers);
+    IReadOnlyList<RolloverTier> Tiers,
+    IReadOnlyList<PlayoffOutcome> Outcomes);
 
 /// <summary>The closing season's shape (`PR-5`).</summary>
 /// <param name="Countries">Every country, each with its active tiers, signed order, and entries.</param>
@@ -74,16 +76,19 @@ public sealed class SeasonRolloverPlanLoader
 {
     private readonly IWorldRepository _world;
     private readonly IMatchdayRepository _matchdays;
+    private readonly IPlayoffRepository _playoffs;
     private readonly RebuildDivisionProjections _rebuild;
 
     /// <summary>Initializes the loader.</summary>
     public SeasonRolloverPlanLoader(
         IWorldRepository world,
         IMatchdayRepository matchdays,
+        IPlayoffRepository playoffs,
         RebuildDivisionProjections rebuild)
     {
         _world = world;
         _matchdays = matchdays;
+        _playoffs = playoffs;
         _rebuild = rebuild;
     }
 
@@ -105,6 +110,21 @@ public sealed class SeasonRolloverPlanLoader
             .ToDictionary(divisionSeason => divisionSeason.DivisionId);
 
         var plan = new List<RolloverCountry>(countries.Count);
+
+        // The bracket's decided matches, per country; a country with none moved only its direct places (PR-4, PR-5).
+        var outcomesOf = (await _playoffs.ListBySeasonAsync(season.Id, cancellationToken))
+            .Where(tie => tie.IsDecided && tie.FeederDivisionId is not null)
+            .GroupBy(tie => tie.CountryId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<PlayoffOutcome>)group
+                    .Select(tie => new PlayoffOutcome(
+                        tie.ParentDivisionId,
+                        tie.FeederDivisionId!.Value,
+                        tie.Stage,
+                        tie.WinnerClubId!.Value,
+                        tie.LoserClubId!.Value))
+                    .ToList());
 
         foreach (var country in countries)
         {
@@ -137,13 +157,24 @@ public sealed class SeasonRolloverPlanLoader
                     division.ParentDivisionId));
             }
 
-            plan.Add(new RolloverCountry(country.Id, country.Code, country.DisplayName, tiers));
+            plan.Add(new RolloverCountry(
+                country.Id,
+                country.Code,
+                country.DisplayName,
+                tiers,
+                outcomesOf.GetValueOrDefault(country.Id, [])));
         }
 
         return new SeasonRolloverPlan(plan);
     }
 
-    /// <summary>Counts the closing season's rounds that are not yet published (`PR-4`).</summary>
+    /// <summary>Counts the closing season's play-off ties that have no winner yet (`PR-4`).</summary>
+    /// <param name="season">The closing season.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public Task<int> CountUndecidedAsync(Season season, CancellationToken cancellationToken) =>
+        _playoffs.CountUndecidedAsync(season.Id, cancellationToken);
+
+    /// <summary>Counts the closing season's rounds that are not yet published, play-off rounds included (`PR-4`).</summary>
     /// <param name="plan">The plan to inspect.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<int> CountUnpublishedAsync(
@@ -222,9 +253,14 @@ public sealed class SeasonRolloverPlanLoader
     /// <summary>Computes every club's movement in a country (`PR-1`).</summary>
     /// <param name="country">The country.</param>
     /// <remarks>
-    /// Until the play-off pipeline stores its results (milestone 4 and 5), no bracket is played, so only the direct places
-    /// move: the 1st and 2nd go up and the 15th and 16th go down.
+    /// The direct places always move; the play-off final moves one more club each way when its challenger wins. A country
+    /// that played no play-off (a late pair, a one-tier country) moves the direct places only.
     /// </remarks>
     public static IReadOnlyList<ClubMovement> MovementsOf(RolloverCountry country) =>
-        PromotionRelegation.Compute(ToLeagues(country), []);
+        PromotionRelegation.Compute(ToLeagues(country), country.Outcomes);
+
+    /// <summary>Lists what makes a country's leagues unfit for the movement rule (`PR-1`); empty when it is fit.</summary>
+    /// <param name="country">The country.</param>
+    public static IReadOnlyList<string> ProblemsOf(RolloverCountry country) =>
+        PromotionRelegation.Validate(ToLeagues(country));
 }

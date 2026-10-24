@@ -96,8 +96,9 @@ public sealed class SeasonRolloverWorkerTests : IAsyncLifetime
 
             await PublishSeasonAsync(scope.ServiceProvider, season.Id);
 
-            // The season's final matchday has passed, so the scheduler finds it due the moment it looks.
-            _clock.UtcNow = season.EndsAt.AddMinutes(1);
+            // The season's final matchday has passed, so the scheduler finds it due the moment it looks. The play-off's semi-final team sheets
+            // have locked too, so no bracket is drawn and the rollover has nothing left to wait for (a late pair moves its direct places only).
+            _clock.UtcNow = SeasonCalendar.PlayoffKickoffs(DateOnly.FromDateTime(season.StartsAt.UtcDateTime))[0].AddHours(1);
         }
 
         await _host.StartAsync();

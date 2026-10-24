@@ -15,7 +15,7 @@ namespace Tactical11Manager.Application.Fans;
 /// the same number the Fan Base page works out live before the lock.
 /// </para>
 /// <para>
-/// A fixture that already has its expectations is left alone, so a lock that repeats, or a resolution that freezes a fixture the lock never
+/// A club that is not in the division-season's table, a visitor to a promotion play-off, is read in its own league's table. A fixture that already has its expectations is left alone, so a lock that repeats, or a resolution that freezes a fixture the lock never
 /// reached, cannot change what the fans held.
 /// </para>
 /// </remarks>
@@ -61,7 +61,23 @@ public sealed class FreezeFanExpectations
             return 0;
         }
 
-        var form = await _queries.GetFormAsync(divisionSeasonId, cancellationToken);
+        var form = (await _queries.GetFormAsync(divisionSeasonId, cancellationToken)).ToDictionary(entry => entry.Key, entry => entry.Value);
+
+        // A promotion play-off is hosted in one league and played by clubs of two, so a club the host's table does not hold is read in its
+        // own league: its form is its own season, not a blank one.
+        var strangers = open
+            .SelectMany(fixture => new[] { fixture.Home.ClubId, fixture.Away.ClubId })
+            .Where(clubId => !form.ContainsKey(clubId))
+            .Distinct()
+            .ToList();
+
+        if (strangers.Count > 0)
+        {
+            foreach (var (clubId, own) in await _queries.GetSeasonFormAsync(open[0].SeasonId, strangers, cancellationToken))
+            {
+                form[clubId] = own;
+            }
+        }
 
         foreach (var fixture in open)
         {

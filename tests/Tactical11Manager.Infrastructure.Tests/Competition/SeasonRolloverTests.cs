@@ -624,6 +624,329 @@ public sealed class SeasonRolloverTests : IAsyncLifetime, IDisposable
         }
     }
 
+    [Fact]
+    public async Task A_play_off_challenger_that_wins_the_final_goes_up_and_the_14th_goes_down_with_the_wording_and_the_parachute()
+    {
+        var (seasonId, countryId) = await SeasonAndFirstCountryAsync();
+
+        await PublishSeasonAsync(seasonId);
+
+        var playoff = await PlayPlayoffAsync(seasonId, countryId, decideFinal: true, challengerWins: true);
+        var managerId = await AttachManagerAsync(playoff.Challenger);
+
+        SeasonRolloverResult result;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            result = await scope.ServiceProvider.GetRequiredService<RunSeasonRollover>()
+                .ExecuteAsync(seasonId, CancellationToken.None);
+        }
+
+        result.Promotions.Should().Be(LaunchCountries.All.Count * WorldRuleSet.DirectPromotionPlaces + 1, "the country with a won final sends three up; the others two");
+        result.Relegations.Should().Be(LaunchCountries.All.Count * WorldRuleSet.DirectRelegationPlaces + 1, "and takes three down");
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+            var nextSeasonId = result.NextSeasonId!.Value;
+
+            (await NextLeagueClubsAsync(db, playoff.ParentDivisionId, nextSeasonId)).Should().HaveCount(WorldRuleSet.ClubsPerDivision)
+                .And.Contain(playoff.Challenger).And.NotContain(playoff.Holder);
+            (await NextLeagueClubsAsync(db, playoff.FeederDivisionId, nextSeasonId)).Should().HaveCount(WorldRuleSet.ClubsPerDivision)
+                .And.Contain(playoff.Holder).And.NotContain(playoff.Challenger).And.Contain(playoff.SemiLoser);
+
+            var entries = await db.ClubSeasonEntries.Where(entry => entry.SeasonId == seasonId).ToListAsync();
+
+            entries.Single(entry => entry.ClubId == playoff.Challenger).IsPromoted.Should().BeTrue();
+            entries.Single(entry => entry.ClubId == playoff.Holder).IsRelegated.Should().BeTrue();
+            entries.Single(entry => entry.ClubId == playoff.SemiLoser).Should().Match<ClubSeasonEntry>(entry => !entry.IsPromoted && !entry.IsRelegated);
+
+            // The final loser is treated as relegated: a parachute, and a standing step that knows it went down (FIN-5, STD-3).
+            (await db.LedgerEntries.Where(entry => entry.Category == LedgerCategory.Parachute).Select(entry => entry.ClubId).ToListAsync())
+                .Should().Contain(playoff.Holder).And.HaveCount(result.Relegations);
+            (await db.ClubStandingEvents.SingleAsync(step => step.SeasonId == seasonId && step.ClubId == playoff.Holder))
+                .NextTier.Should().BeGreaterThan(1);
+
+            var message = await db.InboxMessages.SingleAsync(candidate =>
+                candidate.TemplateKey == InboxTemplates.SeasonMovement && candidate.RecipientManagerId == managerId);
+            var text = InboxMessageText.Render(message.TemplateKey, message.ParametersJson);
+
+            text.Title.Should().StartWith("Promoted");
+            text.Body.Should().Contain("won the play-off final and goes up to");
+        }
+    }
+
+    [Fact]
+    public async Task A_play_off_holder_that_wins_the_final_stays_and_only_the_direct_places_move()
+    {
+        var (seasonId, countryId) = await SeasonAndFirstCountryAsync();
+
+        await PublishSeasonAsync(seasonId);
+
+        var playoff = await PlayPlayoffAsync(seasonId, countryId, decideFinal: true, challengerWins: false);
+        var managerId = await AttachManagerAsync(playoff.Holder);
+
+        SeasonRolloverResult result;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            result = await scope.ServiceProvider.GetRequiredService<RunSeasonRollover>()
+                .ExecuteAsync(seasonId, CancellationToken.None);
+        }
+
+        result.Promotions.Should().Be(LaunchCountries.All.Count * WorldRuleSet.DirectPromotionPlaces);
+        result.Relegations.Should().Be(LaunchCountries.All.Count * WorldRuleSet.DirectRelegationPlaces);
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+            var nextSeasonId = result.NextSeasonId!.Value;
+
+            (await NextLeagueClubsAsync(db, playoff.ParentDivisionId, nextSeasonId)).Should().HaveCount(WorldRuleSet.ClubsPerDivision)
+                .And.Contain(playoff.Holder);
+            (await NextLeagueClubsAsync(db, playoff.FeederDivisionId, nextSeasonId)).Should().HaveCount(WorldRuleSet.ClubsPerDivision)
+                .And.Contain([playoff.Challenger, playoff.SemiLoser]);
+
+            // The holder stayed up, so nobody tells its manager it moved.
+            (await db.InboxMessages.CountAsync(candidate =>
+                candidate.TemplateKey == InboxTemplates.SeasonMovement && candidate.RecipientManagerId == managerId)).Should().Be(0);
+        }
+    }
+
+    [Fact]
+    public async Task The_rollover_waits_while_a_play_off_tie_is_open_and_runs_once_it_is_decided()
+    {
+        var (seasonId, countryId) = await SeasonAndFirstCountryAsync();
+
+        await PublishSeasonAsync(seasonId);
+
+        var playoff = await PlayPlayoffAsync(seasonId, countryId, decideFinal: false, challengerWins: true);
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            await FluentActions
+                .Awaiting(() => scope.ServiceProvider.GetRequiredService<RunSeasonRollover>().ExecuteAsync(seasonId, CancellationToken.None))
+                .Should()
+                .ThrowAsync<InvalidOperationException>("PR-4: an undecided tie is transient, like an unpublished round")
+                .Where(exception => exception.GetType() == typeof(InvalidOperationException));
+
+            var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+            (await db.SeasonRollovers.SingleAsync(row => row.SeasonId == seasonId)).Phase.Should().Be(SeasonRolloverPhase.Started);
+
+            var plans = scope.ServiceProvider.GetRequiredService<IPlayoffRepository>();
+
+            (await plans.CountUndecidedAsync(seasonId, CancellationToken.None)).Should().Be(1);
+            (await plans.IsSeasonSettledAsync(seasonId, CancellationToken.None)).Should().BeFalse();
+
+            var preview = await scope.ServiceProvider.GetRequiredService<PreviewSeasonRollover>()
+                .ExecuteAsync(seasonId, CancellationToken.None);
+
+            preview!.Ready.Should().BeFalse();
+            preview.Preflight.UndecidedPlayoffTies.Should().Be(1);
+            preview.Totals.Promotions.Should().Be(0, "the movement is only worked out once nothing is left to play");
+        }
+
+        await DecideFinalAsync(playoff, challengerWins: true);
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var result = await scope.ServiceProvider.GetRequiredService<RunSeasonRollover>()
+                .ExecuteAsync(seasonId, CancellationToken.None);
+
+            result.Outcome.Should().Be(SeasonRolloverOutcome.Completed);
+            result.Promotions.Should().Be(LaunchCountries.All.Count * WorldRuleSet.DirectPromotionPlaces + 1);
+        }
+    }
+
+    [Fact]
+    public async Task The_scheduler_queues_the_rollover_only_once_every_round_is_published_and_every_tie_decided()
+    {
+        var (seasonId, countryId) = await SeasonAndFirstCountryAsync();
+
+        var season = await WithDbAsync(db => db.Seasons.SingleAsync(candidate => candidate.Id == seasonId));
+
+        // Past the season's last matchday and past the semi-finals' lock, so the catch-up draws nothing and only the gate is under test.
+        var late = SeasonCalendar.PlayoffKickoffs(DateOnly.FromDateTime(season.StartsAt.UtcDateTime))[0].AddHours(1);
+
+        _fixture.Clock.UtcNow = late;
+
+        (await QueuedRolloversAsync(late)).Should().Be(0, "the season's rounds are not published yet");
+
+        await PublishSeasonAsync(seasonId);
+
+        var playoff = await PlayPlayoffAsync(seasonId, countryId, decideFinal: false, challengerWins: true);
+
+        (await QueuedRolloversAsync(late)).Should().Be(0, "a play-off tie has no winner yet");
+
+        await DecideFinalAsync(playoff, challengerWins: true);
+
+        (await QueuedRolloversAsync(late)).Should().Be(1, "nothing is left to play");
+        (await QueuedRolloversAsync(late)).Should().Be(1, "a repeated pass queues nothing more");
+    }
+
+    private async Task<int> QueuedRolloversAsync(DateTimeOffset now)
+    {
+        await using var scope = _fixture.CreateScope();
+
+        // The scheduler is worker-only and internal, so the test builds it the way the worker's container would.
+        var type = typeof(Tactical11ManagerDbContext).Assembly.GetType("Tactical11Manager.Infrastructure.Competition.SeasonRolloverScheduler")
+            ?? throw new InvalidOperationException("The season-rollover scheduler type moved.");
+        var scheduler = (IJobMaterializer)ActivatorUtilities.CreateInstance(scope.ServiceProvider, type);
+
+        await scheduler.MaterializeAsync(now, CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        return await db.Jobs.CountAsync(job => job.JobType == SeasonRolloverJobTypes.Rollover);
+    }
+
+    private async Task<T> WithDbAsync<T>(Func<Tactical11ManagerDbContext, Task<T>> read)
+    {
+        await using var scope = _fixture.CreateScope();
+
+        return await read(scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>());
+    }
+
+    private async Task<(Guid SeasonId, Guid CountryId)> SeasonAndFirstCountryAsync()
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+
+        var seasonId = await db.Seasons
+            .Where(candidate => candidate.WorldId == _fixture.WorldId)
+            .Select(candidate => candidate.Id)
+            .SingleAsync();
+        var countryId = await db.Countries
+            .OrderBy(country => country.SortOrder)
+            .Select(country => country.Id)
+            .FirstAsync();
+
+        return (seasonId, countryId);
+    }
+
+    private static async Task<List<Guid>> NextLeagueClubsAsync(Tactical11ManagerDbContext db, Guid divisionId, Guid nextSeasonId) =>
+        await (
+            from entry in db.ClubSeasonEntries
+            join divisionSeason in db.DivisionSeasons on entry.DivisionSeasonId equals divisionSeason.Id
+            where divisionSeason.DivisionId == divisionId && divisionSeason.SeasonId == nextSeasonId
+            select entry.ClubId)
+            .ToListAsync();
+
+    /// <summary>
+    /// Plays one country's bracket the way the pipeline stores it, without the engine: the semi-final is won by the home club (the 3rd),
+    /// and the final is won by the challenger or the holder as asked. The play-off rounds are published, so the table is untouched.
+    /// </summary>
+    private async Task<PlayoffPlayed> PlayPlayoffAsync(Guid seasonId, Guid countryId, bool decideFinal, bool challengerWins)
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var now = _fixture.Clock.UtcNow;
+
+        var season = await db.Seasons.SingleAsync(candidate => candidate.Id == seasonId);
+        var divisions = await db.Divisions.Where(division => division.CountryId == countryId).ToListAsync();
+        var parent = divisions.Single(division => division.TierNumber == 1);
+        var feeder = divisions.Single(division => division.TierNumber == 2);
+
+        var leagues = new List<LeagueStandings>();
+
+        foreach (var division in divisions)
+        {
+            leagues.Add(new LeagueStandings(
+                division.Id,
+                division.TierNumber,
+                division.LeagueNumber,
+                division.ParentDivisionId,
+                await RankedClubsAsync(scope, division.Id, seasonId)));
+        }
+
+        var pairings = PlayoffBracket.Draw(leagues);
+        var semiPairing = pairings.Single(pairing => pairing.Stage == PlayoffStage.SemiFinal);
+        var finalPairing = pairings.Single(pairing => pairing.Stage == PlayoffStage.Final);
+        var kickoffs = SeasonCalendar.PlayoffKickoffs(DateOnly.FromDateTime(season.StartsAt.UtcDateTime));
+
+        var divisionSeasons = await db.DivisionSeasons
+            .Where(divisionSeason => divisionSeason.SeasonId == seasonId)
+            .ToDictionaryAsync(divisionSeason => divisionSeason.DivisionId);
+
+        var semi = PlayoffTie.Draw(Guid.CreateVersion7(), seasonId, countryId, semiPairing, now);
+        var final = PlayoffTie.Draw(Guid.CreateVersion7(), seasonId, countryId, finalPairing, now);
+
+        AddPlayedRound(db, semi, divisionSeasons[feeder.Id].Id, kickoffs[semi.Slot - 1], homeWins: true, now);
+        semi.Decide(semi.HomeClubId, PlayoffDecision.Score, null, null, null, now);
+        final.FillAway(semi.HomeClubId, feeder.Id, semi.HomePlace, now);
+        db.PlayoffTies.AddRange(semi, final);
+
+        AddPlayedRound(db, final, divisionSeasons[parent.Id].Id, kickoffs[final.Slot - 1], homeWins: !challengerWins, now);
+
+        // A final that was played but whose tie was never decided is the state an operator is left with when progression failed.
+        if (decideFinal)
+        {
+            final.Decide(challengerWins ? semi.HomeClubId : final.HomeClubId, PlayoffDecision.Score, null, null, null, now);
+        }
+
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        return new PlayoffPlayed(parent.Id, feeder.Id, final.HomeClubId, semi.HomeClubId, semi.AwayClubId!.Value, final.Id);
+    }
+
+    /// <summary>Gives a played final its winner, as an operator would once the cause was found.</summary>
+    private async Task DecideFinalAsync(PlayoffPlayed playoff, bool challengerWins)
+    {
+        await using var scope = _fixture.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
+        var now = _fixture.Clock.UtcNow;
+
+        var final = await db.PlayoffTies.SingleAsync(tie => tie.Id == playoff.FinalTieId);
+
+        final.Decide(challengerWins ? playoff.Challenger : playoff.Holder, PlayoffDecision.Score, null, null, null, now);
+
+        await db.SaveChangesAsync(CancellationToken.None);
+    }
+
+    private static void AddPlayedRound(
+        Tactical11ManagerDbContext db,
+        PlayoffTie tie,
+        Guid hostDivisionSeasonId,
+        DateTimeOffset kickoff,
+        bool homeWins,
+        DateTimeOffset now)
+    {
+        var fixture = AddRound(db, tie, hostDivisionSeasonId, kickoff, now);
+        var matchday = db.Matchdays.Local.Single(candidate => candidate.Id == fixture.MatchdayId);
+
+        fixture.Lock(now);
+        fixture.Stage(homeWins ? 1 : 0, homeWins ? 0 : 1, Guid.CreateVersion7(), now);
+        fixture.Publish(now);
+        matchday.MarkStaged(now);
+        matchday.Publish(now);
+    }
+
+    private static Fixture AddRound(
+        Tactical11ManagerDbContext db,
+        PlayoffTie tie,
+        Guid hostDivisionSeasonId,
+        DateTimeOffset kickoff,
+        DateTimeOffset now)
+    {
+        var matchday = Matchday.SchedulePlayoff(Guid.CreateVersion7(), hostDivisionSeasonId, tie.Slot, kickoff, now);
+        var fixture = Fixture.Schedule(Guid.CreateVersion7(), matchday.Id, tie.HomeClubId, tie.AwayClubId!.Value, kickoff, now);
+
+        db.Matchdays.Add(matchday);
+        db.Fixtures.Add(fixture);
+        tie.AttachFixture(fixture.Id, now);
+
+        return fixture;
+    }
+
+    private sealed record PlayoffPlayed(
+        Guid ParentDivisionId,
+        Guid FeederDivisionId,
+        Guid Holder,
+        Guid Challenger,
+        Guid SemiLoser,
+        Guid FinalTieId);
+
     /// <summary>The total position awards every rank of a tier earns (`FIN-5`).</summary>
     private static long SumPositionAwards(int tier) =>
         Enumerable.Range(1, WorldRuleSet.ClubsPerDivision)

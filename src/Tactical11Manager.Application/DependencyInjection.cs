@@ -8,6 +8,7 @@ using Tactical11Manager.Application.Auth.Validation;
 using Tactical11Manager.Application.Calendar;
 using Tactical11Manager.Application.Comms;
 using Tactical11Manager.Application.Competition;
+using Tactical11Manager.Application.Competition.Playoffs;
 using Tactical11Manager.Application.Fans;
 using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Forum;
@@ -466,6 +467,11 @@ public static class DependencyInjection
         services.AddScoped<LockMatchday>();
         services.AddScoped<ResolveMatchday>();
         services.AddScoped<PublishMatchday>();
+
+        // The promotion play-off: the draw at the league season's end, the decision of each tie, and the messages of both (PR-4, ADR-0087).
+        services.AddScoped<PlayoffNotifications>();
+        services.AddScoped<PlayoffDraw>();
+        services.AddScoped<PlayoffProgression>();
 
         // The operator's resume of a stuck round (master plan §10.8, F-46, ADR-0044).
         services.AddScoped<ResumeMatchday>();

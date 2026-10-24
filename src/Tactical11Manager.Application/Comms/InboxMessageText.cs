@@ -3,6 +3,7 @@ using Tactical11Manager.Application.Finance;
 using Tactical11Manager.Application.Market;
 using Tactical11Manager.Application.Match;
 using Tactical11Manager.Application.World;
+using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.World;
@@ -50,6 +51,10 @@ public static class InboxMessageText
         {
             InboxTemplates.ResultRecorded => Result(
                 InboxTemplates.Read<InboxTemplates.ResultParameters>(parametersJson)),
+            PlayoffInboxTemplates.Drawn => PlayoffDrawn(
+                PlayoffInboxTemplates.Read<PlayoffInboxTemplates.DrawnParameters>(parametersJson)),
+            PlayoffInboxTemplates.FinalSet => PlayoffFinalSet(
+                PlayoffInboxTemplates.Read<PlayoffInboxTemplates.FinalSetParameters>(parametersJson)),
             InboxTemplates.TableMoved => Table(
                 InboxTemplates.Read<InboxTemplates.TableParameters>(parametersJson)),
             InboxTemplates.SuspensionImposed => Suspension(
@@ -237,6 +242,11 @@ public static class InboxMessageText
 
     private static InboxText Result(InboxTemplates.ResultParameters parameters)
     {
+        if (parameters.Stage is not null)
+        {
+            return PlayoffResult(parameters);
+        }
+
         var verb = parameters.Outcome switch
         {
             InboxTemplates.WinOutcome => "Won",
@@ -258,6 +268,76 @@ public static class InboxMessageText
             $"Round {parameters.RoundNumber}: {venue}",
             "The result is in. Watch the match, or show the result.",
             $"{verb} {score}. You are {Ordinal(parameters.Position)} in the table after round {parameters.RoundNumber}.");
+    }
+
+    private static InboxText PlayoffResult(InboxTemplates.ResultParameters parameters)
+    {
+        var label = PlayoffStageRules.FromCode(parameters.Stage!).Label();
+
+        var venue = parameters.IsHome
+            ? $"At home to {parameters.OpponentName}"
+            : $"Away to {parameters.OpponentName}";
+
+        var verb = parameters.Outcome switch
+        {
+            InboxTemplates.WinOutcome => "Won",
+            InboxTemplates.LossOutcome => "Lost",
+            _ => "Drew",
+        };
+
+        var score = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{parameters.GoalsFor}–{parameters.GoalsAgainst}");
+
+        var detail = parameters.ShootoutFor is { } shootoutFor && parameters.ShootoutAgainst is { } shootoutAgainst
+            ? $"{verb} {score} after 90 minutes, and {(shootoutFor > shootoutAgainst ? "won" : "lost")} "
+                + string.Create(CultureInfo.InvariantCulture, $"{Math.Max(shootoutFor, shootoutAgainst)}–{Math.Min(shootoutFor, shootoutAgainst)} on penalties.")
+            : $"{verb} {score}.";
+
+        var fate = parameters.Fate switch
+        {
+            PlayoffFates.ToFinal => " You go through to the play-off final.",
+            PlayoffFates.Promoted => " You are promoted.",
+            PlayoffFates.StaysUp => " You stay up.",
+            PlayoffFates.Relegated => " You are relegated.",
+            PlayoffFates.StaysDown => " You stay in your league.",
+            PlayoffFates.Out => " You are out of the play-off.",
+            _ => string.Empty,
+        };
+
+        // The score, who won and what it means are all held back, as a league result's are: a manager watches the match first.
+        return new InboxText(
+            $"{label}: {venue}",
+            "The result is in. Watch the match, or show the result.",
+            detail + fate);
+    }
+
+    private static InboxText PlayoffDrawn(PlayoffInboxTemplates.DrawnParameters parameters)
+    {
+        var stage = PlayoffStageRules.FromCode(parameters.Stage);
+
+        var versus = parameters.OpponentName is null
+            ? "The away side is the winner of the lower league's semi-final."
+            : parameters.IsHome
+                ? $"You host {parameters.OpponentName}."
+                : $"You visit {parameters.OpponentName}.";
+
+        return new InboxText(
+            $"{stage.Label()}: you finished {Ordinal(parameters.Place)}",
+            $"{versus} Kickoff is {Moment(parameters.KickoffAt)}.");
+    }
+
+    private static InboxText PlayoffFinalSet(PlayoffInboxTemplates.FinalSetParameters parameters)
+    {
+        var venue = parameters.IsHome
+            ? $"At home to {parameters.OpponentName}"
+            : $"Away to {parameters.OpponentName}";
+
+        // Who the opponent is gives the semi-final away, so it waits behind the same gate as the result.
+        return new InboxText(
+            "Play-off final: your match is set",
+            "The semi-final is in. Watch it, or show the result.",
+            $"{venue}. Kickoff is {Moment(parameters.KickoffAt)}.");
     }
 
     private static InboxText Table(InboxTemplates.TableParameters parameters)
@@ -299,16 +379,31 @@ public static class InboxMessageText
             $"{parameters.PlayerName} was released for {Money(parameters.PayoutMinor)} and joins the "
             + "free-agent pool at the next weekly batch.");
 
-    private static InboxText Movement(InboxTemplates.MovementParameters parameters) =>
-        new(
-            parameters.Promoted
-                ? $"Promoted to {parameters.ToDivision}"
-                : $"Relegated to {parameters.ToDivision}",
+    private static InboxText Movement(InboxTemplates.MovementParameters parameters)
+    {
+        var title = parameters.Promoted
+            ? $"Promoted to {parameters.ToDivision}"
+            : $"Relegated to {parameters.ToDivision}";
+
+        if (parameters.Route == InboxTemplates.PlayoffRoute)
+        {
+            return new InboxText(
+                title,
+                parameters.Promoted
+                    ? $"{parameters.ClubName} won the play-off final and goes up to "
+                        + $"{parameters.ToDivision} from {parameters.FromDivision}."
+                    : $"{parameters.ClubName} lost the play-off final and goes down to "
+                        + $"{parameters.ToDivision} from {parameters.FromDivision}.");
+        }
+
+        return new InboxText(
+            title,
             parameters.Promoted
                 ? $"{parameters.ClubName} finished in the promotion places and goes up to "
                     + $"{parameters.ToDivision} from {parameters.FromDivision}."
                 : $"{parameters.ClubName} finished in the relegation places and goes down to "
                     + $"{parameters.ToDivision} from {parameters.FromDivision}.");
+    }
 
     private static InboxText RepairedSide(InboxTemplates.TeamSheetParameters parameters)
     {
@@ -316,7 +411,7 @@ public static class InboxMessageText
 
         return new InboxText(
             "Your side was changed",
-            $"Before round {parameters.RoundNumber}, these places in your side were decided for you: "
+            $"Before {RoundName(parameters.RoundNumber).ToLowerInvariant()}, these places in your side were decided for you: "
             + $"{string.Join("; ", places)}.");
     }
 
@@ -369,9 +464,20 @@ public static class InboxMessageText
             : $"Away to {parameters.OpponentName}";
 
         return new InboxText(
-            $"Round {parameters.RoundNumber}: submit your team sheet",
+            $"{RoundName(parameters.RoundNumber)}: submit your team sheet",
             $"{venue}. Your team sheet locks at {Moment(parameters.LockAt)}.");
     }
+
+    /// <summary>
+    /// Names a round for a message: a league round by its number, and the rounds after the thirtieth by the play-off match they hold
+    /// (the semi-final's slot is 31, the final's 32, or 33 when it was set late).
+    /// </summary>
+    private static string RoundName(int roundNumber) => roundNumber switch
+    {
+        <= WorldRuleSet.MatchdaysPerSeason => $"Round {roundNumber}",
+        WorldRuleSet.MatchdaysPerSeason + WorldRuleSet.PlayoffSemiSlot => PlayoffStage.SemiFinal.Label(),
+        _ => PlayoffStage.Final.Label(),
+    };
 
     private static string Days(int count) =>
         string.Create(CultureInfo.InvariantCulture, $"{count} day{(count == 1 ? string.Empty : "s")}");

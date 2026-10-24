@@ -41,7 +41,7 @@ namespace Tactical11Manager.Worker.IntegrationTests;
 /// The seasons are played by fabrication, not simulation, exactly as <c>SeasonRolloverTests</c> does: the
 /// point of the run is continuity across seasons, and the matchday pipeline and the engine are pinned by
 /// their own suites. The world is seeded for real, with tiers 1 and 2 in every country so
-/// three-up/three-down has an adjacent pair to act between, and two human tenures are attached so the
+/// the movement has an adjacent pair to act between, and two human tenures are attached so the
 /// human/AI mix the stage asks for is real.
 /// </para>
 /// </remarks>
@@ -160,24 +160,14 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
         {
             await FabricateSeasonAsync(seasonId);
 
-            DateTimeOffset endsAt;
+            // The season's own deadline has passed, and so has the play-off's semi-final lock, so no bracket is drawn and the rollover is
+            // due: the real job is enqueued and the worker runs the resumable machine (the trigger is the scheduler's own
+            // materialisation, ADR-0034).
+            _clock.UtcNow = await RolloverDueAtAsync(seasonId);
 
             await using (var scope = _host!.Services.CreateAsyncScope())
             {
-                var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
-                endsAt = await db.Seasons
-                    .Where(season => season.Id == seasonId)
-                    .Select(season => season.EndsAt)
-                    .SingleAsync();
-            }
-
-            // The season's own deadline has passed, so the rollover is due: the real job is enqueued and the
-            // worker runs the resumable machine (the trigger is the scheduler's own materialisation, ADR-0034).
-            _clock.UtcNow = endsAt.AddMinutes(1);
-
-            await using (var scope = _host.Services.CreateAsyncScope())
-            {
-                var trigger = scope.ServiceProvider.GetRequiredService<TriggerSeasonRollover>();
+                var trigger =scope.ServiceProvider.GetRequiredService<TriggerSeasonRollover>();
                 var triggered = await trigger.ExecuteAsync(seasonId, CancellationToken.None);
 
                 triggered.Outcome.Should().Be(TriggerSeasonRolloverOutcome.Enqueued);
@@ -196,7 +186,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
     public async Task A_redelivered_rollover_in_the_run_moves_nothing_twice()
     {
         await FabricateSeasonAsync(_seasonId);
-        _clock.UtcNow = (await SeasonEndsAtAsync(_seasonId)).AddMinutes(1);
+        _clock.UtcNow = await RolloverDueAtAsync(_seasonId);
 
         await using (var scope = _host!.Services.CreateAsyncScope())
         {
@@ -223,7 +213,7 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
                 .Be(2, "the second delivery created no third season");
             (await db.ClubSeasonEntries.CountAsync(entry => entry.SeasonId == _seasonId && entry.IsPromoted))
                 .Should()
-                .Be(LaunchCountries.All.Count * 3, "the movement was not re-applied");
+                .Be(LaunchCountries.All.Count * WorldRuleSet.DirectPromotionPlaces, "the movement was not re-applied");
         }
     }
 
@@ -296,15 +286,15 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
                 reconciled.Outcome.Should().Be(ProjectionRebuildOutcome.Reconciled);
             }
 
-            // Three up and three down between the one adjacent pair; every closing entry carries its rank, and
+            // Two up and two down between the one adjacent pair (no bracket was drawn); every closing entry carries its rank, and
             // the played season's results stay the record of what happened (PR-1, PR-4, PR-6).
             var closingEntries = await db.ClubSeasonEntries
                 .Where(entry => entry.SeasonId == closing.Id)
                 .ToListAsync();
 
             closingEntries.Should().OnlyContain(entry => entry.FinalRank != null, "every entry was closed");
-            closingEntries.Count(entry => entry.IsPromoted).Should().Be(LaunchCountries.All.Count * 3);
-            closingEntries.Count(entry => entry.IsRelegated).Should().Be(LaunchCountries.All.Count * 3);
+            closingEntries.Count(entry => entry.IsPromoted).Should().Be(LaunchCountries.All.Count * WorldRuleSet.DirectPromotionPlaces);
+            closingEntries.Count(entry => entry.IsRelegated).Should().Be(LaunchCountries.All.Count * WorldRuleSet.DirectRelegationPlaces);
 
             var closingFixtures = await db.Fixtures.CountAsync(fixture =>
                 fixture.Status == FixtureStatus.Published
@@ -340,9 +330,9 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
         (await db.SeasonRollovers.CountAsync(row => row.WorldId == _worldId
             && row.Phase == SeasonRolloverPhase.Completed)).Should().Be(Seasons);
 
-        // Three up and three down in every country every season, and never a duplicate.
-        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsPromoted)).Should().Be(Seasons * LaunchCountries.All.Count * 3);
-        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsRelegated)).Should().Be(Seasons * LaunchCountries.All.Count * 3);
+        // Two up and two down in every country every season, and never a duplicate.
+        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsPromoted)).Should().Be(Seasons * LaunchCountries.All.Count * WorldRuleSet.DirectPromotionPlaces);
+        (await db.ClubSeasonEntries.CountAsync(entry => entry.IsRelegated)).Should().Be(Seasons * LaunchCountries.All.Count * WorldRuleSet.DirectRelegationPlaces);
 
         // Every club still has a legal squad (SQ-2, SQ-8).
         var roster = scope.ServiceProvider.GetRequiredService<IRosterQueries>();
@@ -463,12 +453,18 @@ public sealed class StagingSeasonRunTests : IAsyncLifetime
         }
     }
 
-    private async Task<DateTimeOffset> SeasonEndsAtAsync(Guid seasonId)
+    /// <summary>
+    /// The first instant the season has nothing left to wait for: the semi-finals' team sheets have locked, so a league that finished
+    /// without a bracket moves its direct places only (a late pair, `PR-4`).
+    /// </summary>
+    private async Task<DateTimeOffset> RolloverDueAtAsync(Guid seasonId)
     {
         await using var scope = _host!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<Tactical11ManagerDbContext>();
 
-        return await db.Seasons.Where(season => season.Id == seasonId).Select(season => season.EndsAt).SingleAsync();
+        var startsAt = await db.Seasons.Where(season => season.Id == seasonId).Select(season => season.StartsAt).SingleAsync();
+
+        return SeasonCalendar.PlayoffKickoffs(DateOnly.FromDateTime(startsAt.UtcDateTime))[0].AddHours(1);
     }
 
     /// <summary>Waits for the season's rollover job to reach a terminal state, reporting a dead letter.</summary>

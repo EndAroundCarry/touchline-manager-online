@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Tactical11Manager.Domain.Comms;
+using Tactical11Manager.Domain.Competition;
 
 namespace Tactical11Manager.Application.Comms;
 
@@ -39,6 +40,9 @@ public static class NewsTemplates
 
     /// <summary>A division's round was published (`MAT-7`).</summary>
     public const string ResultPublished = "news.result.published";
+
+    /// <summary>A promotion play-off bracket was drawn (`PR-4`).</summary>
+    public const string PlayoffDrawn = "news.playoff.drawn";
 
     /// <summary>An operator posted a game notice (`F-46`, ADR-0045).</summary>
     public const string AnnouncementPublished = "news.announcement.published";
@@ -118,6 +122,70 @@ public static class NewsTemplates
             countryId: null,
             divisionId);
 
+    /// <summary>Builds the item a promotion play-off match produces.</summary>
+    /// <param name="stage">The match's stage, which the headline names instead of a round.</param>
+    /// <param name="homeClubName">The host.</param>
+    /// <param name="homeGoals">The host's goals in the 90 minutes.</param>
+    /// <param name="awayClubName">The visitor.</param>
+    /// <param name="awayGoals">The visitor's goals in the 90 minutes.</param>
+    /// <param name="shootoutHome">The host's penalties scored, when the tie went to a shoot-out.</param>
+    /// <param name="shootoutAway">The visitor's penalties scored, when the tie went to a shoot-out.</param>
+    /// <param name="divisionId">The division that hosted the match, which scopes the item.</param>
+    /// <param name="matchId">The played match.</param>
+    public static NewsDraft PlayoffRound(
+        PlayoffStage stage,
+        string homeClubName,
+        int homeGoals,
+        string awayClubName,
+        int awayGoals,
+        int? shootoutHome,
+        int? shootoutAway,
+        Guid divisionId,
+        Guid matchId) =>
+        Write(
+            NewsCategory.Result,
+            ResultPublished,
+            new ResultParameters(
+                0,
+                homeClubName,
+                homeGoals,
+                awayClubName,
+                awayGoals,
+                matchId,
+                stage.ToCode(),
+                shootoutHome,
+                shootoutAway),
+            countryId: null,
+            divisionId);
+
+    /// <summary>Builds the item a drawn promotion play-off produces.</summary>
+    /// <param name="upperDivisionName">The higher league of the pair.</param>
+    /// <param name="lowerDivisionName">The lower league of the pair.</param>
+    /// <param name="semiHomeClubName">The semi-final's host.</param>
+    /// <param name="semiAwayClubName">The semi-final's visitor.</param>
+    /// <param name="holderClubName">The higher league's club that waits in the final.</param>
+    /// <param name="countryId">The country, which scopes the item.</param>
+    /// <param name="upperDivisionId">The higher league, which scopes the item.</param>
+    public static NewsDraft PlayoffDraw(
+        string upperDivisionName,
+        string lowerDivisionName,
+        string semiHomeClubName,
+        string semiAwayClubName,
+        string holderClubName,
+        Guid countryId,
+        Guid upperDivisionId) =>
+        Write(
+            NewsCategory.Division,
+            PlayoffDrawn,
+            new PlayoffDrawParameters(
+                upperDivisionName,
+                lowerDivisionName,
+                semiHomeClubName,
+                semiAwayClubName,
+                holderClubName),
+            countryId,
+            upperDivisionId);
+
     private static NewsDraft Write<TParameters>(
         NewsCategory category,
         string templateKey,
@@ -174,7 +242,17 @@ public static class NewsTemplates
         int HomeGoals,
         string AwayClubName,
         int AwayGoals,
-        Guid? MatchId = null);
+        Guid? MatchId = null,
+        string? Stage = null,
+        int? ShootoutHome = null,
+        int? ShootoutAway = null);
+
+    internal sealed record PlayoffDrawParameters(
+        string UpperDivisionName,
+        string LowerDivisionName,
+        string SemiHomeClubName,
+        string SemiAwayClubName,
+        string HolderClubName);
 
     internal sealed record AnnouncementParameters(string Title, string Body);
 }

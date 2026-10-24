@@ -36,7 +36,8 @@ public sealed record AdvanceGameClockResult(
 /// <para>
 /// A <c>matchday</c> step with no round left is the end of the season: it lands on the active season's end (never earlier than now)
 /// and makes sure the season's rollover job is on the queue, reviving one that was dead-lettered, so the toolbar's last press closes the
-/// season and opens the next. The worker still runs the rollover, preflight and all.
+/// season and opens the next. The worker still runs the rollover, preflight and all. While the season still has a round to publish or
+/// a promotion play-off tie to decide it is not at its end, so the step is a day and the rollover is left alone (ADR-0087).
 /// </para>
 /// <para>
 /// It is reachable only from a development-flagged endpoint and is never mapped in production (§17.12).
@@ -51,14 +52,21 @@ public sealed class AdvanceGameClock
     private readonly IMatchdayRepository _matchdays;
     private readonly IJobQueue _jobs;
     private readonly IWorldRepository _world;
+    private readonly IPlayoffRepository _playoffs;
 
     /// <summary>Initializes the use case.</summary>
-    public AdvanceGameClock(IGameClockStore clockStore, IMatchdayRepository matchdays, IJobQueue jobs, IWorldRepository world)
+    public AdvanceGameClock(
+        IGameClockStore clockStore,
+        IMatchdayRepository matchdays,
+        IJobQueue jobs,
+        IWorldRepository world,
+        IPlayoffRepository playoffs)
     {
         _clockStore = clockStore;
         _matchdays = matchdays;
         _jobs = jobs;
         _world = world;
+        _playoffs = playoffs;
     }
 
     /// <summary>Resolves the target instant and enqueues the advance job, due now.</summary>
@@ -120,10 +128,12 @@ public sealed class AdvanceGameClock
                 return (upcoming[0].KickoffAt, null);
             }
 
-            // No round left: the step that remains is the end of the season, which is what lets its rollover run.
+            // No round left to lock: the step that remains is the end of the season, which is what lets its rollover run. A season that
+            // still has a round to publish or a play-off tie to decide is not at its end, so the step is one day, which lets the worker
+            // finish it (PR-4).
             var season = await ClockSeason.FindActiveAsync(_world, cancellationToken);
 
-            if (season is not null)
+            if (season is not null && await _playoffs.IsSeasonSettledAsync(season.Id, cancellationToken))
             {
                 return (season.EndsAt > now ? season.EndsAt : now, season);
             }

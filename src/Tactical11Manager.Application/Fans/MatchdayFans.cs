@@ -59,7 +59,34 @@ public sealed class MatchdayFans
             ?? throw new InvalidOperationException($"Division {divisionId:D} has no tier, so its fans cannot be moved (FAN-5).");
 
         var clubIds = published.SelectMany(fixture => new[] { fixture.HomeClubId, fixture.AwayClubId }).Distinct().ToList();
-        var bases = await _keeper.LoadAsync(clubIds, _ => tier, seasonId, now, cancellationToken);
+
+        return await ApplyAsync(seasonId, clubIds.ToDictionary(clubId => clubId, _ => tier), published, now, cancellationToken);
+    }
+
+    /// <summary>Applies one round's results to the fans of every club that played, each at the tier of its own league.</summary>
+    /// <param name="seasonId">The season the round belongs to.</param>
+    /// <param name="tierOf">The tier each club that played belongs to this season. A promotion play-off match is played by clubs of two tiers.</param>
+    /// <param name="published">The fixtures the round published.</param>
+    /// <param name="now">The current instant, taken from the caller's clock.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>How many clubs' fans moved.</returns>
+    public async Task<int> ApplyAsync(
+        Guid seasonId,
+        IReadOnlyDictionary<Guid, int> tierOf,
+        IReadOnlyList<Fixture> published,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tierOf);
+        ArgumentNullException.ThrowIfNull(published);
+
+        if (published.Count == 0)
+        {
+            return 0;
+        }
+
+        var clubIds = published.SelectMany(fixture => new[] { fixture.HomeClubId, fixture.AwayClubId }).Distinct().ToList();
+        var bases = await _keeper.LoadAsync(clubIds, clubId => tierOf[clubId], seasonId, now, cancellationToken);
         var firstSeason = await _queries.GetFirstSeasonClubIdsAsync(clubIds, cancellationToken);
 
         var expected = (await _fans.LoadExpectationsAsync([.. published.Select(fixture => fixture.Id)], cancellationToken))
@@ -82,6 +109,7 @@ public sealed class MatchdayFans
         void Apply(Fixture fixture, Guid clubId, bool atHome, int goalsFor, int goalsAgainst)
         {
             var fanBase = bases[clubId];
+            var tier = tierOf[clubId];
             var expectedPoints = expected.TryGetValue((fixture.Id, clubId), out var frozen)
                 ? frozen.ExpectedPointsCentis
                 : FanRuleSet.ExpectationForGap(0, atHome).ExpectedPointsCentis;

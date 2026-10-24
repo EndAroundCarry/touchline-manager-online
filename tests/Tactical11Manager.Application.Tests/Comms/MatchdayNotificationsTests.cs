@@ -2,6 +2,7 @@ using FluentAssertions;
 using Tactical11Manager.Application.Abstractions.Comms;
 using Tactical11Manager.Application.Comms;
 using Tactical11Manager.Domain.Comms;
+using Tactical11Manager.Domain.Competition;
 
 namespace Tactical11Manager.Application.Tests.Comms;
 
@@ -52,11 +53,87 @@ public sealed class MatchdayNotificationsTests
 
         var hostText = inbox.TextsFor(host);
         hostText.Should().ContainSingle().Which.Title.Should().Be("Round 4: At home to Away FC");
-        hostText[0].Spoiler.Should().StartWith("Won 2\u20131");
+        hostText[0].Spoiler.Should().StartWith("Won 2–1");
 
         var awayText = inbox.TextsFor(away);
         awayText.Should().ContainSingle().Which.Title.Should().Be("Round 4: Away to Host FC");
-        awayText[0].Spoiler.Should().StartWith("Lost 1\u20132");
+        awayText[0].Spoiler.Should().StartWith("Lost 1–2");
+    }
+
+    [Fact]
+    public async Task A_play_off_result_names_its_stage_and_what_it_meant_and_has_no_table_position()
+    {
+        var host = Guid.CreateVersion7();
+        var away = Guid.CreateVersion7();
+
+        var inbox = new FakeInbox()
+            .WithClub(host, Guid.CreateVersion7(), "Host FC")
+            .WithClub(away, Guid.CreateVersion7(), "Away FC");
+
+        var news = new FakeNews();
+
+        await new MatchdayNotifications(inbox, news).NotifyPublishedAsync(
+            roundNumber: 31,
+            WorldId,
+            DivisionId,
+            [new PlayedFixtureFact(Guid.CreateVersion7(), Guid.CreateVersion7(), host, away, HomeGoals: 1, AwayGoals: 1)],
+            positions: [],
+            effects: [],
+            Now,
+            CancellationToken.None,
+            new PlayoffResultFact(PlayoffStage.SemiFinal, WinnerClubId: away, HolderClubId: Guid.Empty, ShootoutHomeScore: 3, ShootoutAwayScore: 4));
+
+        inbox.Added.Should().HaveCount(2, "one result for each manager, and no table message");
+
+        var hostText = inbox.TextsFor(host).Should().ContainSingle().Subject;
+
+        hostText.Title.Should().Be("Play-off semi-final: At home to Away FC");
+        hostText.Body.Should().Be("The result is in. Watch the match, or show the result.");
+        hostText.Spoiler.Should().Be("Drew 1–1 after 90 minutes, and lost 4–3 on penalties. You are out of the play-off.");
+
+        var awayText = inbox.TextsFor(away).Should().ContainSingle().Subject;
+
+        awayText.Title.Should().Be("Play-off semi-final: Away to Host FC");
+        awayText.Spoiler.Should().Be("Drew 1–1 after 90 minutes, and won 4–3 on penalties. You go through to the play-off final.");
+
+        var item = news.Added.Should().ContainSingle().Subject;
+        var newsText = NewsMessageText.Render(item.TemplateKey, item.ParametersJson);
+
+        newsText.Title.Should().Be("Play-off semi-final: Host FC v Away FC");
+        newsText.Body.Should().Be("The result is in.");
+        newsText.Spoiler.Should().Be("Host FC 1–1 Away FC (3–4 on penalties)");
+    }
+
+    [Theory]
+    [InlineData(true, true, "You stay up.")]
+    [InlineData(false, true, "You are relegated.")]
+    [InlineData(true, false, "You stay in your league.")]
+    [InlineData(false, false, "You are promoted.")]
+    public async Task A_final_tells_the_holder_and_the_challenger_what_it_meant(bool hostWon, bool asHost, string expected)
+    {
+        var host = Guid.CreateVersion7();
+        var away = Guid.CreateVersion7();
+
+        var inbox = new FakeInbox()
+            .WithClub(host, Guid.CreateVersion7(), "Holder FC")
+            .WithClub(away, Guid.CreateVersion7(), "Challenger FC");
+
+        // The holder is the home club; the winner is the host when hostWon, and the message read is the holder's or the challenger's.
+        await Compose(inbox).NotifyPublishedAsync(
+            roundNumber: 32,
+            WorldId,
+            DivisionId,
+            [new PlayedFixtureFact(Guid.CreateVersion7(), Guid.CreateVersion7(), host, away, HomeGoals: hostWon ? 2 : 0, AwayGoals: hostWon ? 0 : 2)],
+            positions: [],
+            effects: [],
+            Now,
+            CancellationToken.None,
+            new PlayoffResultFact(PlayoffStage.Final, hostWon ? host : away, HolderClubId: host, null, null));
+
+        var text = inbox.TextsFor(asHost ? host : away).Should().ContainSingle().Subject;
+
+        text.Title.Should().StartWith("Play-off final:");
+        text.Spoiler.Should().EndWith(expected);
     }
 
     [Fact]

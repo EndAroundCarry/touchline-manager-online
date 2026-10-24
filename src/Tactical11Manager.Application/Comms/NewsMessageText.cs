@@ -1,4 +1,5 @@
 using System.Globalization;
+using Tactical11Manager.Domain.Competition;
 
 namespace Tactical11Manager.Application.Comms;
 
@@ -45,6 +46,8 @@ public static class NewsMessageText
                 NewsTemplates.Read<NewsTemplates.FreeAgentParameters>(parametersJson)),
             NewsTemplates.ResultPublished => Round(
                 NewsTemplates.Read<NewsTemplates.ResultParameters>(parametersJson)),
+            NewsTemplates.PlayoffDrawn => PlayoffDraw(
+                NewsTemplates.Read<NewsTemplates.PlayoffDrawParameters>(parametersJson)),
             NewsTemplates.AnnouncementPublished => Announcement(
                 NewsTemplates.Read<NewsTemplates.AnnouncementParameters>(parametersJson)),
             _ => throw new InvalidOperationException($"'{templateKey}' is not a news template this build renders."),
@@ -69,6 +72,12 @@ public static class NewsMessageText
             $"{parameters.BuyerClubName} has signed {parameters.PlayerName} as a free agent "
             + $"for {Money(parameters.FeeMinor)}.");
 
+    private static NewsText PlayoffDraw(NewsTemplates.PlayoffDrawParameters parameters) =>
+        new(
+            $"{parameters.UpperDivisionName}: the play-off is drawn",
+            $"{parameters.SemiHomeClubName} host {parameters.SemiAwayClubName} in the {parameters.LowerDivisionName} semi-final. "
+            + $"The winner plays {parameters.HolderClubName} for a place in {parameters.UpperDivisionName}.");
+
     private static NewsText Round(NewsTemplates.ResultParameters parameters)
     {
         var score = string.Create(
@@ -77,10 +86,18 @@ public static class NewsMessageText
 
         // The score is the result, so it is not in the headline or the detail: a manager who has not watched
         // this match is not told how it went by the news.
+        var heading = parameters.Stage is { } stage
+            ? PlayoffStageRules.FromCode(stage).Label()
+            : $"Round {parameters.RoundNumber}";
+
+        var shootout = parameters.ShootoutHome is { } home && parameters.ShootoutAway is { } away
+            ? string.Create(CultureInfo.InvariantCulture, $" ({home}–{away} on penalties)")
+            : string.Empty;
+
         return new NewsText(
-            $"Round {parameters.RoundNumber}: {parameters.HomeClubName} v {parameters.AwayClubName}",
+            $"{heading}: {parameters.HomeClubName} v {parameters.AwayClubName}",
             "The result is in.",
-            $"{parameters.HomeClubName} {score} {parameters.AwayClubName}",
+            $"{parameters.HomeClubName} {score} {parameters.AwayClubName}{shootout}",
             parameters.MatchId);
     }
 

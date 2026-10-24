@@ -7,6 +7,7 @@ using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.Squad;
 using Tactical11Manager.Domain.Squad.Generation;
 using Tactical11Manager.Domain.World;
+using Tactical11Manager.Domain.World.Generation;
 
 namespace Tactical11Manager.SimulationBenchmarks;
 
@@ -111,15 +112,14 @@ internal sealed partial class EconSim
             club.FirstSeason = false;
         }
 
-        // One league per tier, so a tier's division identity is its number. Until the play-off is simulated (milestone 5) only the direct places move.
-        var movements = PromotionRelegation.Compute(
-            [.. Enumerable.Range(1, Tiers).Select(tier => new LeagueStandings(
-                TierDivisionId(tier),
-                tier,
-                1,
-                tier == 1 ? null : TierDivisionId(tier - 1),
-                [.. Table(tier).Select(club => club.Guid)]))],
-            []);
+        // One league per tier, so a tier's division identity is its number. The play-off is a seeded coin, so two or three clubs move each way.
+        var leagues = Enumerable.Range(1, Tiers).Select(tier => new LeagueStandings(
+            TierDivisionId(tier),
+            tier,
+            1,
+            tier == 1 ? null : TierDivisionId(tier - 1),
+            [.. Table(tier).Select(club => club.Guid)])).ToList();
+        var movements = PromotionRelegation.Compute(leagues, DrawPlayoffs(leagues));
         var byGuid = Clubs.ToDictionary(club => club.Guid);
 
         var nextTier = movements.ToDictionary(movement => movement.ClubId, movement => movement.ToTier);
@@ -141,6 +141,39 @@ internal sealed partial class EconSim
         }
 
         RolloverSquads();
+    }
+
+    /// <summary>Plays each pair's promotion play-off with a seeded coin: the semi-final, then the final against the higher league's 14th.</summary>
+    private List<PlayoffOutcome> DrawPlayoffs(List<LeagueStandings> leagues)
+    {
+        var outcomes = new List<PlayoffOutcome>();
+
+        foreach (var pairing in PlayoffBracket.Draw(leagues).Where(pairing => pairing.Stage == PlayoffStage.SemiFinal))
+        {
+            var rng = new Pcg32(DeterministicDigest.SeedOf(
+                _seedText,
+                "playoff",
+                Season.ToString(CultureInfo.InvariantCulture),
+                pairing.FeederDivisionId.ToString("N")));
+
+            var semiAway = pairing.AwayClubId!.Value;
+            var semiWinner = rng.NextInt(2) == 0 ? pairing.HomeClubId : semiAway;
+            var semiLoser = semiWinner == pairing.HomeClubId ? semiAway : pairing.HomeClubId;
+
+            var holder = leagues.Single(league => league.DivisionId == pairing.ParentDivisionId)
+                .RankedClubIds[WorldRuleSet.PlayoffHolderPlace - 1];
+            var challengerWins = rng.NextInt(2) == 0;
+
+            outcomes.Add(new PlayoffOutcome(pairing.ParentDivisionId, pairing.FeederDivisionId, PlayoffStage.SemiFinal, semiWinner, semiLoser));
+            outcomes.Add(new PlayoffOutcome(
+                pairing.ParentDivisionId,
+                pairing.FeederDivisionId,
+                PlayoffStage.Final,
+                challengerWins ? semiWinner : holder,
+                challengerWins ? holder : semiWinner));
+        }
+
+        return outcomes;
     }
 
     // The simulation has one league per tier, so a tier's number is its division's identity.
