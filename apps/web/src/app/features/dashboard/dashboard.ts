@@ -321,9 +321,9 @@ export class Dashboard {
     return venueLabel(value);
   }
 
-  /** A round's label. */
-  protected round(roundNumber: number): string {
-    return roundLabel(roundNumber);
+  /** A match's label: its round, or its stage in words for a promotion play-off match. */
+  protected round(roundNumber: number, stageLabel: string | null = null): string {
+    return roundLabel(roundNumber, stageLabel);
   }
 
   /** How long until a fixture's team sheets lock (`CAL-3`). */

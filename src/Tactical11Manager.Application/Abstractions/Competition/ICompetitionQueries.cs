@@ -18,6 +18,7 @@ public sealed record FixtureClubRow(Guid Id, string Name, string ShortName);
 /// <param name="AwayScore">The away score, once a result exists.</param>
 /// <param name="MatchId">The simulated match, once a result is staged.</param>
 /// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
+/// <param name="Stage">The play-off stage when the fixture is a promotion play-off match (`PR-4`), otherwise null.</param>
 public sealed record FixtureRow(
     Guid Id,
     Guid HomeClubId,
@@ -27,7 +28,8 @@ public sealed record FixtureRow(
     int? HomeScore,
     int? AwayScore,
     Guid? MatchId,
-    bool IsBootstrap);
+    bool IsBootstrap,
+    PlayoffStage? Stage);
 
 /// <summary>One round of a division's season, with the fixtures it comprises (`CAL-10`).</summary>
 /// <param name="Id">The matchday identity.</param>
@@ -36,13 +38,15 @@ public sealed record FixtureRow(
 /// <param name="KickoffAt">The round's kickoff (`CAL-2`).</param>
 /// <param name="PublicationStatus">Whether the round is pending, staged, or published (`MAT-7`).</param>
 /// <param name="Fixtures">The round's fixtures, in a stable order.</param>
+/// <param name="Kind">What the round is for: a league round or a promotion play-off match (`PR-4`).</param>
 public sealed record FixtureMatchdayRow(
     Guid Id,
     int RoundNumber,
     DateTimeOffset LockAt,
     DateTimeOffset KickoffAt,
     MatchdayPublicationStatus PublicationStatus,
-    IReadOnlyList<FixtureRow> Fixtures);
+    IReadOnlyList<FixtureRow> Fixtures,
+    MatchdayKind Kind);
 
 /// <summary>A division-season's whole fixture calendar (master plan §10.5).</summary>
 /// <param name="DivisionId">The division identity.</param>
@@ -86,6 +90,7 @@ public sealed record DivisionFixturesSnapshot(
 /// <param name="AwayScore">The away score, once a result exists.</param>
 /// <param name="MatchId">The simulated match, once a result is staged.</param>
 /// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
+/// <param name="Stage">The play-off stage when the fixture is a promotion play-off match (`PR-4`), otherwise null.</param>
 public sealed record ClubFixtureRow(
     Guid Id,
     int RoundNumber,
@@ -104,7 +109,8 @@ public sealed record ClubFixtureRow(
     int? HomeScore,
     int? AwayScore,
     Guid? MatchId,
-    bool IsBootstrap);
+    bool IsBootstrap,
+    PlayoffStage? Stage);
 
 /// <summary>A club's season fixture list (master plan §11.1).</summary>
 /// <param name="ClubId">The managed club.</param>
@@ -157,6 +163,7 @@ public sealed record FixtureSideRow(
 /// <param name="AwayScore">The away score, once a result exists.</param>
 /// <param name="MatchId">The simulated match, once a result is staged.</param>
 /// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
+/// <param name="Playoff">The promotion play-off tie the fixture is the match of, or null for a league match (`PR-4`).</param>
 public sealed record FixtureDetailSnapshot(
     Guid Id,
     Guid MatchdayId,
@@ -173,7 +180,8 @@ public sealed record FixtureDetailSnapshot(
     int? HomeScore,
     int? AwayScore,
     Guid? MatchId,
-    bool IsBootstrap);
+    bool IsBootstrap,
+    PlayoffMatchRow? Playoff);
 
 /// <summary>One row of a division's table, in the order the division is ranked (`TBL-10`).</summary>
 /// <param name="Rank">The 1-based position.</param>
@@ -214,6 +222,8 @@ public sealed record DivisionTableRow(
 /// <param name="SeasonNumber">The season's ordinal in the world.</param>
 /// <param name="SeasonLabel">The season's display label.</param>
 /// <param name="Rows">Every club's line, best first.</param>
+/// <param name="HasParent">Whether the league feeds a higher one, so its top places can go up (`PR-1`).</param>
+/// <param name="HasFeeder">Whether an active lower league feeds it, so its bottom places can go down (`PR-1`).</param>
 public sealed record DivisionTableSnapshot(
     Guid DivisionId,
     string DivisionName,
@@ -223,7 +233,9 @@ public sealed record DivisionTableSnapshot(
     string CountryName,
     int SeasonNumber,
     string SeasonLabel,
-    IReadOnlyList<DivisionTableRow> Rows);
+    IReadOnlyList<DivisionTableRow> Rows,
+    bool HasParent,
+    bool HasFeeder);
 
 /// <summary>One player's season statistics in a division, most goals first (`STA-1`…`STA-4`).</summary>
 /// <param name="PlayerId">The player.</param>

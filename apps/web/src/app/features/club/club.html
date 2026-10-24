@@ -217,7 +217,9 @@
                 @for (fixture of results(); track fixture.id) {
                   <li class="flex flex-wrap items-center justify-between gap-2 p-3">
                     <div class="flex flex-wrap items-baseline gap-x-2">
-                      <span class="text-sm text-ink-2">{{ round(fixture.roundNumber) }}</span>
+                      <span class="text-sm text-ink-2">{{
+                        round(fixture.roundNumber, fixture.stageLabel)
+                      }}</span>
                       <span class="font-medium">
                         @if (fixture.venue === 'home') {
                           {{ profile.shortName }} v
@@ -279,7 +281,9 @@
                 @for (fixture of upcoming(); track fixture.id) {
                   <li class="flex flex-wrap items-center justify-between gap-2 p-3">
                     <div class="flex flex-wrap items-baseline gap-x-2">
-                      <span class="text-sm text-ink-2">{{ round(fixture.roundNumber) }}</span>
+                      <span class="text-sm text-ink-2">{{
+                        round(fixture.roundNumber, fixture.stageLabel)
+                      }}</span>
                       <span class="font-medium">
                         @if (fixture.venue === 'home') {
                           {{ profile.shortName }} v

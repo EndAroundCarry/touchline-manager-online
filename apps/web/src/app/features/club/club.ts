@@ -216,9 +216,9 @@ export class ClubPage {
     return venueLabel(fixture.venue);
   }
 
-  /** A round's label. */
-  protected round(roundNumber: number): string {
-    return roundLabel(roundNumber);
+  /** A match's label: its round, or its stage in words for a promotion play-off match. */
+  protected round(roundNumber: number, stageLabel: string | null = null): string {
+    return roundLabel(roundNumber, stageLabel);
   }
 
   /** The scoreline, the home side's goals first, as the names beside it are ordered. */

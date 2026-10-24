@@ -233,6 +233,9 @@ function match(): Match {
     },
     engineVersion: 'engine-v4',
     presentationVersion: 'replay-v3',
+    kind: 'league',
+    stageLabel: null,
+    playoff: null,
     serverTime: '2026-10-06T21:00:00Z',
   };
 }
@@ -736,6 +739,120 @@ describe('MatchViewer', () => {
 
       expect(native.querySelector('h1')?.textContent).toContain('1\u20130');
       expect(native.querySelector('#mv-reveal')).toBeNull();
+    });
+  });
+
+  describe('a promotion play-off match', () => {
+    function shootout(): Match {
+      const kick = (
+        number: number,
+        round: number,
+        side: string,
+        taker: string,
+        outcome: string,
+      ) => ({
+        number,
+        round,
+        side,
+        takerName: taker,
+        goalkeeperName: 'A Keeper',
+        outcome,
+      });
+
+      return {
+        ...match(),
+        roundNumber: 32,
+        kind: 'playoff',
+        stageLabel: 'Play-off final',
+        home: { ...match().home, goals: 1 },
+        away: { ...match().away, goals: 1 },
+        playoff: {
+          stage: 'final',
+          stageLabel: 'Play-off final',
+          decidedBy: 'penalties',
+          winnerClubId: 'c2',
+          shootoutHomeScore: 3,
+          shootoutAwayScore: 4,
+          firstSide: 'home',
+          kicks: [
+            kick(1, 1, 'home', 'Home Taker One', 'scored'),
+            kick(2, 1, 'away', 'Away Taker One', 'scored'),
+            kick(3, 2, 'home', 'Home Taker Two', 'saved'),
+            kick(4, 2, 'away', 'Away Taker Two', 'scored'),
+          ],
+        },
+      };
+    }
+
+    async function loadShootout(): Promise<HTMLElement> {
+      const native = fixture.nativeElement as HTMLElement;
+
+      (fixture.componentInstance as unknown as { toggleTextOnly(): void }).toggleTextOnly();
+
+      store.match.set(shootout());
+      store.presentation.set(presentation());
+
+      await fixture.whenStable();
+
+      return native;
+    }
+
+    it('is named by its stage, not by a round number', async () => {
+      const native = await loadShootout();
+
+      expect(native.querySelector('header p')?.textContent).toContain('Play-off final');
+      expect(native.querySelector('header p')?.textContent).not.toContain('Round');
+    });
+
+    it('keeps who won and the shoot-out back until the result has been seen', async () => {
+      const native = await loadShootout();
+
+      expect(native.querySelector('[data-testid="playoff-result"]')).toBeNull();
+
+      buttonByText(native, 'Report')!.click();
+      await fixture.whenStable();
+
+      expect(
+        native.querySelector('#panel-hidden'),
+        'the report waits for the result',
+      ).not.toBeNull();
+      expect(native.querySelector('[data-testid="shootout"]')).toBeNull();
+      expect(native.textContent).not.toContain('penalties');
+    });
+
+    it('says who won on penalties, and lists the kicks, once the result is shown', async () => {
+      const native = await loadShootout();
+
+      buttonByText(native, 'Show result')!.click();
+      await fixture.whenStable();
+
+      expect(native.querySelector('[data-testid="playoff-result"]')?.textContent).toContain(
+        'Bramford Rovers won 4–3 on penalties',
+      );
+
+      buttonByText(native, 'Report')!.click();
+      await fixture.whenStable();
+
+      const rounds = [...native.querySelectorAll('[data-testid="shootout-round"]')];
+
+      expect(rounds).toHaveLength(2);
+      expect(rounds[0].textContent).toContain('Home Taker One');
+      expect(rounds[0].textContent).toContain('Away Taker One');
+      expect(rounds[1].textContent).toContain('Home Taker Two');
+      expect(rounds[1].textContent, 'a miss is said in words').toContain('Saved');
+    });
+
+    it('shows no shoot-out for a league match', async () => {
+      const native = await load();
+
+      buttonByText(native, 'Show result')!.click();
+      await fixture.whenStable();
+      buttonByText(native, 'Report')!.click();
+      await fixture.whenStable();
+
+      expect(native.querySelector('[data-testid="shootout"]')).toBeNull();
+      expect(native.querySelector('[data-testid="playoff-result"]')).toBeNull();
+      expect(native.querySelector('header p')?.textContent).toContain('Round 1');
     });
   });
 

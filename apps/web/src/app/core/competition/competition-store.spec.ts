@@ -136,6 +136,8 @@ function table(): DivisionTable {
         points: 0,
         yellowCards: 0,
         redCards: 0,
+        zone: 'none',
+        zoneLabel: '',
       },
     ],
     serverTime: '2026-09-25T00:00:00Z',

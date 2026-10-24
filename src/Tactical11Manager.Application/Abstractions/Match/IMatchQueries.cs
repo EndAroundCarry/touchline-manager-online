@@ -1,3 +1,4 @@
+using Tactical11Manager.Application.Abstractions.Competition;
 using Tactical11Manager.Domain.Match;
 
 namespace Tactical11Manager.Application.Abstractions.Match;
@@ -53,6 +54,7 @@ public sealed record MatchClubRow(
 /// <param name="Home">The host.</param>
 /// <param name="Away">The visitor.</param>
 /// <param name="Snapshot">The frozen input the match was simulated from.</param>
+/// <param name="Playoff">The promotion play-off tie the match settled, or null for a league match (`PR-4`).</param>
 public sealed record MatchReadSnapshot(
     Guid MatchId,
     Guid FixtureId,
@@ -74,7 +76,8 @@ public sealed record MatchReadSnapshot(
     string OutputHash,
     MatchClubRow Home,
     MatchClubRow Away,
-    InputSnapshot Snapshot);
+    InputSnapshot Snapshot,
+    PlayoffMatchRow? Playoff);
 
 /// <summary>
 /// The read side of the match module: one played match, for the summary and the replay (master plan §9.5).

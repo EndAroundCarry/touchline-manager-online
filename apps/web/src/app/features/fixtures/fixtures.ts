@@ -230,9 +230,9 @@ export class Fixtures implements OnDestroy {
     return outcomeLabel(fixture.outcome);
   }
 
-  /** A round's label. */
-  protected round(roundNumber: number): string {
-    return roundLabel(roundNumber);
+  /** A match's label: its round, or its stage in words for a promotion play-off match. */
+  protected round(roundNumber: number, stageLabel: string | null = null): string {
+    return roundLabel(roundNumber, stageLabel);
   }
 
   /** How long until this fixture's sheets lock (`CAL-3`). */

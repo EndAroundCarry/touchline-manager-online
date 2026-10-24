@@ -221,7 +221,7 @@ export class FanBasePage {
   }
 
   protected round(fixture: ClubFixture): string {
-    return roundLabel(fixture.roundNumber);
+    return roundLabel(fixture.roundNumber, fixture.stageLabel);
   }
 
   protected venue(fixture: ClubFixture): string {

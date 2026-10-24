@@ -6,10 +6,49 @@ namespace Tactical11Manager.Contracts.Competition;
 /// <param name="ShortName">The abbreviation.</param>
 public sealed record FixtureClubResponse(Guid Id, string Name, string ShortName);
 
+/// <summary>One kick of a play-off shoot-out, in the order it was taken (`PR-6`).</summary>
+/// <param name="Number">The kick's place in the shoot-out, from 1.</param>
+/// <param name="Round">The round, from 1: each side kicks once a round.</param>
+/// <param name="Side">The side that took it, <c>home</c> or <c>away</c>.</param>
+/// <param name="TakerName">The player who took it.</param>
+/// <param name="GoalkeeperName">The goalkeeper who faced it, or null when the other side had none on the pitch.</param>
+/// <param name="Outcome">How it ended: <c>scored</c>, <c>saved</c> or <c>wide</c>.</param>
+public sealed record PlayoffKickResponse(
+    int Number,
+    int Round,
+    string Side,
+    string TakerName,
+    string? GoalkeeperName,
+    string Outcome);
+
+/// <summary>
+/// How a promotion play-off match was settled, present only once its fixture is published (`PR-6`).
+/// </summary>
+/// <remarks>
+/// It gives the draw away when the 90 minutes finished level, so a client holds it back behind the same gate as the score.
+/// </remarks>
+/// <param name="Stage">The stage code: <c>semi_final</c> or <c>final</c>.</param>
+/// <param name="StageLabel">The words for the stage, e.g. <c>Play-off final</c>.</param>
+/// <param name="DecidedBy">How the tie was settled: <c>score</c> or <c>penalties</c>. Null while it is undecided.</param>
+/// <param name="WinnerClubId">The club that goes through. Null while the tie is undecided.</param>
+/// <param name="ShootoutHomeScore">The home side's shoot-out goals, when the tie went to penalties.</param>
+/// <param name="ShootoutAwayScore">The away side's shoot-out goals, when the tie went to penalties.</param>
+/// <param name="FirstSide">The side that kicked first, <c>home</c> or <c>away</c>, when the tie went to penalties.</param>
+/// <param name="Kicks">The shoot-out's kicks in order; empty unless the tie went to penalties.</param>
+public sealed record PlayoffResultResponse(
+    string Stage,
+    string StageLabel,
+    string? DecidedBy,
+    Guid? WinnerClubId,
+    int? ShootoutHomeScore,
+    int? ShootoutAwayScore,
+    string? FirstSide,
+    IReadOnlyList<PlayoffKickResponse> Kicks);
+
 /// <summary>One fixture, as a division's calendar and a club's own list show it.</summary>
 /// <param name="Id">The fixture identity.</param>
 /// <param name="MatchdayId">The round the fixture belongs to.</param>
-/// <param name="RoundNumber">The round number, 1–30 (`CAL-1`).</param>
+/// <param name="RoundNumber">The round number, 1–30 (`CAL-1`); 31–33 for a promotion play-off match (`PR-4`).</param>
 /// <param name="HomeClubId">The host.</param>
 /// <param name="AwayClubId">The visitor.</param>
 /// <param name="KickoffAt">The kickoff instant, in UTC (`CAL-2`).</param>
@@ -18,6 +57,8 @@ public sealed record FixtureClubResponse(Guid Id, string Name, string ShortName)
 /// <param name="AwayScore">The away score, present only once the result is staged or published.</param>
 /// <param name="MatchId">The simulated match, present once a result is staged.</param>
 /// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
+/// <param name="Kind">What the match is for: <c>league</c> or <c>playoff</c> (`PR-4`).</param>
+/// <param name="StageLabel">For a play-off match, the words for its stage; null for a league match.</param>
 public sealed record FixtureSummaryResponse(
     Guid Id,
     Guid MatchdayId,
@@ -29,7 +70,9 @@ public sealed record FixtureSummaryResponse(
     int? HomeScore,
     int? AwayScore,
     Guid? MatchId,
-    bool IsBootstrap);
+    bool IsBootstrap,
+    string Kind,
+    string? StageLabel);
 
 /// <summary>One round of a division's season, with the eight fixtures it comprises (`CAL-10`).</summary>
 /// <param name="Id">The matchday identity.</param>
@@ -38,13 +81,17 @@ public sealed record FixtureSummaryResponse(
 /// <param name="KickoffAt">The kickoff, shared by every fixture in the round (`CAL-2`).</param>
 /// <param name="PublicationStatus">Whether the round is pending, staged, or published (`MAT-7`).</param>
 /// <param name="Fixtures">The round's fixtures, in a stable order.</param>
+/// <param name="Kind">What the round is for: <c>league</c> or <c>playoff</c> (`PR-4`).</param>
+/// <param name="StageLabel">For a play-off round, the words for its stage; null for a league round.</param>
 public sealed record FixtureMatchdayResponse(
     Guid Id,
     int RoundNumber,
     DateTimeOffset LockAt,
     DateTimeOffset KickoffAt,
     string PublicationStatus,
-    IReadOnlyList<FixtureSummaryResponse> Fixtures);
+    IReadOnlyList<FixtureSummaryResponse> Fixtures,
+    string Kind,
+    string? StageLabel);
 
 /// <summary>
 /// A division-season's whole fixture calendar (master plan §10.5).
@@ -104,6 +151,8 @@ public sealed record DivisionFixturesResponse(
 /// <param name="MatchId">The simulated match, once a result is staged.</param>
 /// <param name="Outcome">For a published fixture, the managed club's result: <c>win</c>, <c>draw</c>, or <c>loss</c>. Null otherwise.</param>
 /// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
+/// <param name="Kind">What the match is for: <c>league</c> or <c>playoff</c> (`PR-4`).</param>
+/// <param name="StageLabel">For a play-off match, the words for its stage; null for a league match.</param>
 public sealed record ClubFixtureResponse(
     Guid Id,
     int RoundNumber,
@@ -122,7 +171,9 @@ public sealed record ClubFixtureResponse(
     int? AwayScore,
     Guid? MatchId,
     string? Outcome,
-    bool IsBootstrap);
+    bool IsBootstrap,
+    string Kind,
+    string? StageLabel);
 
 /// <summary>
 /// A managed club's season fixture list, with its next fixture called out (master plan §11.1).
@@ -196,6 +247,9 @@ public sealed record FixtureSideResponse(
 /// <param name="AwayScore">The away score, once a result exists.</param>
 /// <param name="MatchId">The simulated match, once a result is staged.</param>
 /// <param name="IsBootstrap">Whether the result is generated history a provisioned tier backfilled (`PYR-7`).</param>
+/// <param name="Kind">What the match is for: <c>league</c> or <c>playoff</c> (`PR-4`).</param>
+/// <param name="StageLabel">For a play-off match, the words for its stage; null for a league match.</param>
+/// <param name="Playoff">How a play-off match was settled, present only once the fixture is published (`PR-6`).</param>
 /// <param name="ServerTime">The instant the response was produced.</param>
 public sealed record FixtureDetailResponse(
     Guid Id,
@@ -217,4 +271,7 @@ public sealed record FixtureDetailResponse(
     int? AwayScore,
     Guid? MatchId,
     bool IsBootstrap,
+    string Kind,
+    string? StageLabel,
+    PlayoffResultResponse? Playoff,
     DateTimeOffset ServerTime);

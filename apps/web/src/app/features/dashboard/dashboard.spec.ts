@@ -114,6 +114,8 @@ const NEXT_FIXTURE: ClubFixture = {
   awayScore: null,
   matchId: null,
   outcome: null,
+  kind: 'league',
+  stageLabel: null,
 };
 
 /** A match the manager's club has played, whose result they have not yet seen. */

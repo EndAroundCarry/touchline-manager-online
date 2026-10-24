@@ -54,7 +54,8 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     points: [
       'Every division has 16 clubs, and one season is 30 matchdays: you meet each rival once at home and once away.',
       "A win is worth three points, a draw one, and a defeat none. Clubs that finish level are separated by goal difference, then goals scored, then a fixed list of further criteria: your division's rules screen shows that list, and the draw the season was given.",
-      'At the end of a season three clubs are promoted and three relegated between neighbouring divisions. The lowest division relegates nobody, and the top division promotes nobody, because there is no division beyond it.',
+      'At the end of a season the top two clubs of a lower division are promoted, and the bottom two of the division above it are relegated. The lowest division relegates nobody, and the top division promotes nobody, because there is no division beyond it.',
+      "The lower division's third and fourth clubs then play a promotion play-off with the higher division's fourteenth: a semi-final between the third and fourth, then a final at the fourteenth's ground. Each is a single match, and a draw after 90 minutes goes to a penalty shoot-out. If the lower club wins the final it goes up and the fourteenth goes down; otherwise nobody else moves.",
       'If you stop signing in, the game looks after your club before it takes it from you: ten days without a login brings a warning, fourteen hands routine decisions to the AI, and twenty-one closes your tenure. Signing in at any point is how you take full control back.',
     ],
     links: [{ label: "Open your division's table", path: '/competitions' }],
@@ -111,7 +112,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     summary: 'A season is 30 matchdays, then a short rollover, then the next one begins.',
     points: [
       'A season runs its 30 matchdays, then the game takes nine days to close the season and open the next one.',
-      'Promotion and relegation are applied only at the rollover, once every result and every table is final. A club that moves keeps its squad, its contracts, its cash and its history.',
+      'The promotion play-offs are played in the days after matchday 30. Promotion and relegation are applied only at the rollover, once every result, every table and every play-off is final. A club that moves keeps its squad, its contracts, its cash and its history.',
       'Contracts advance a year at the rollover rather than on a real-world anniversary. The board automatically renews every expiring contract at the rollover, so you never lose a player when a deal runs out.',
       'An older player may announce that the coming season is their last. The announcement reaches your inbox, so you can plan for the place it leaves.',
       "Finished seasons are kept. Your club's earlier seasons stay readable, with the division it played in and where it finished.",

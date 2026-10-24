@@ -23,6 +23,8 @@ export function clubFixture(overrides: Partial<ClubFixture> = {}): ClubFixture {
     awayScore: null,
     matchId: null,
     outcome: null,
+    kind: 'league',
+    stageLabel: null,
     ...overrides,
   };
 }

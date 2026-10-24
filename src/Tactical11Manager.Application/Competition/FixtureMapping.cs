@@ -2,6 +2,7 @@ using Tactical11Manager.Application.Abstractions.Competition;
 using Tactical11Manager.Application.Squad;
 using Tactical11Manager.Contracts.Competition;
 using Tactical11Manager.Domain.Competition;
+using Tactical11Manager.Domain.Rules;
 using Tactical11Manager.Domain.World;
 using Tactical11Manager.MatchEngine.Highlights;
 
@@ -54,15 +55,22 @@ public static class FixtureMapping
             snapshot.CountryName,
             snapshot.SeasonNumber,
             snapshot.SeasonLabel,
-            [.. snapshot.Rows.Select(ToResponse)],
+            [.. snapshot.Rows.Select(row => row.ToResponse(snapshot.HasParent, snapshot.HasFeeder))],
             serverTime);
     }
 
     /// <summary>Projects one table row.</summary>
     /// <param name="row">The row.</param>
-    public static DivisionTableRowResponse ToResponse(this DivisionTableRow row)
+    /// <param name="hasParent">Whether the league feeds a higher one, so its top places can go up.</param>
+    /// <param name="hasFeeder">Whether an active lower league feeds it, so its bottom places can go down.</param>
+    public static DivisionTableRowResponse ToResponse(this DivisionTableRow row, bool hasParent, bool hasFeeder)
     {
         ArgumentNullException.ThrowIfNull(row);
+
+        // The words come from the domain's own zones, so the table cannot name a place the rollover would treat differently (PR-1).
+        var zone = row.Rank is >= 1 and <= WorldRuleSet.ClubsPerDivision
+            ? LeagueZones.For(hasParent, hasFeeder, row.Rank)
+            : LeagueZone.None;
 
         return new DivisionTableRowResponse(
             row.Rank,
@@ -80,7 +88,9 @@ public static class FixtureMapping
             row.GoalsFor - row.GoalsAgainst,
             row.Points,
             row.YellowCards,
-            row.RedCards);
+            row.RedCards,
+            zone.ToCode(),
+            zone.Label());
     }
 
     /// <summary>Projects a division's player season statistics.</summary>
@@ -310,7 +320,52 @@ public static class FixtureMapping
             matchday.LockAt,
             matchday.KickoffAt,
             matchday.PublicationStatus.ToCode(),
-            [.. matchday.Fixtures.Select(fixture => fixture.ToResponse(matchday.Id, matchday.RoundNumber))]);
+            [.. matchday.Fixtures.Select(fixture => fixture.ToResponse(matchday.Id, matchday.RoundNumber))],
+            matchday.Kind.ToCode(),
+            matchday.Fixtures.Select(fixture => fixture.Stage).FirstOrDefault(stage => stage is not null)?.Label());
+    }
+
+    /// <summary>The words for a play-off match's stage, or null for a league match.</summary>
+    /// <param name="stage">The stage, or null for a league match.</param>
+    public static string? StageLabelOf(PlayoffStage? stage) => stage?.Label();
+
+    /// <summary>What a match is for, from its play-off stage: <c>league</c> without one.</summary>
+    /// <param name="stage">The stage, or null for a league match.</param>
+    public static string KindOf(PlayoffStage? stage) =>
+        (stage is null ? MatchdayKind.League : MatchdayKind.Playoff).ToCode();
+
+    /// <summary>
+    /// Projects how a play-off match was settled, or null for a league match or while the fixture is unpublished.
+    /// </summary>
+    /// <remarks>
+    /// The shoot-out is held back with the score: a level 90 minutes is itself a spoiler, and a staged result is not public (`MAT-7`).
+    /// </remarks>
+    /// <param name="row">The stored tie, or null for a league match.</param>
+    /// <param name="status">The fixture's lifecycle state.</param>
+    public static PlayoffResultResponse? ToResponse(this PlayoffMatchRow? row, FixtureStatus status)
+    {
+        if (row is null || status != FixtureStatus.Published)
+        {
+            return null;
+        }
+
+        return new PlayoffResultResponse(
+            row.Stage.ToCode(),
+            row.Stage.Label(),
+            row.DecidedBy?.ToCode(),
+            row.WinnerClubId,
+            row.ShootoutHomeScore,
+            row.ShootoutAwayScore,
+            row.FirstSide,
+            [
+                .. row.Kicks.Select(kick => new PlayoffKickResponse(
+                    kick.Number,
+                    kick.Round,
+                    kick.Side,
+                    kick.TakerName,
+                    kick.GoalkeeperName,
+                    kick.Outcome)),
+            ]);
     }
 
     /// <summary>Projects one fixture as a calendar shows it.</summary>
@@ -337,7 +392,9 @@ public static class FixtureMapping
             home,
             away,
             matchId,
-            fixture.IsBootstrap);
+            fixture.IsBootstrap,
+            KindOf(fixture.Stage),
+            StageLabelOf(fixture.Stage));
     }
 
     /// <summary>Projects a club's own fixture list, naming its next fixture.</summary>
@@ -400,7 +457,9 @@ public static class FixtureMapping
             away,
             matchId,
             Outcome(fixture),
-            fixture.IsBootstrap);
+            fixture.IsBootstrap,
+            KindOf(fixture.Stage),
+            StageLabelOf(fixture.Stage));
     }
 
     /// <summary>Projects a fixture in full, resolving the caller's side when they hold one of the clubs.</summary>
@@ -454,6 +513,9 @@ public static class FixtureMapping
             away,
             matchId,
             snapshot.IsBootstrap,
+            KindOf(snapshot.Playoff?.Stage),
+            StageLabelOf(snapshot.Playoff?.Stage),
+            snapshot.Playoff.ToResponse(snapshot.Status),
             serverTime);
     }
 

@@ -1,4 +1,5 @@
 using Tactical11Manager.Application.Abstractions.Match;
+using Tactical11Manager.Application.Competition;
 using Tactical11Manager.Contracts.Match;
 using Tactical11Manager.Domain.Competition;
 using Tactical11Manager.Domain.World;
@@ -65,6 +66,9 @@ public static class MatchMapping
                 ToResponse(statistics.Away)),
             snapshot.EngineVersion,
             ReplayDirector.Version,
+            FixtureMapping.KindOf(snapshot.Playoff?.Stage),
+            FixtureMapping.StageLabelOf(snapshot.Playoff?.Stage),
+            snapshot.Playoff.ToResponse(FixtureStatus.Published),
             serverTime);
     }
 

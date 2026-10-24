@@ -560,6 +560,8 @@ describe('PlayerProfile', () => {
             awayScore: 1,
             matchId: 'match-0',
             outcome: 'win',
+            kind: 'league',
+            stageLabel: null,
           },
         ],
       });

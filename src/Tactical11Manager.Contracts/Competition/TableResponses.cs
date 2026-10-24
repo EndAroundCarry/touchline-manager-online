@@ -15,6 +15,8 @@ namespace Tactical11Manager.Contracts.Competition;
 /// <param name="Points">Points: three a win, one a draw (`TBL-1`).</param>
 /// <param name="YellowCards">Yellow cards accumulated (`TBL-9`).</param>
 /// <param name="RedCards">Red cards accumulated (`TBL-8`).</param>
+/// <param name="Zone">What the place leads to at the end of the season: <c>none</c>, <c>promotion</c>, <c>playoff</c> or <c>relegation</c> (`PR-1`).</param>
+/// <param name="ZoneLabel">The words for the zone, empty for none, so the table never says it in colour alone.</param>
 public sealed record DivisionTableRowResponse(
     int Rank,
     Guid ClubId,
@@ -29,7 +31,9 @@ public sealed record DivisionTableRowResponse(
     int GoalDifference,
     int Points,
     int YellowCards,
-    int RedCards);
+    int RedCards,
+    string Zone,
+    string ZoneLabel);
 
 /// <summary>A division's table for the season in progress.</summary>
 /// <param name="DivisionId">The division.</param>

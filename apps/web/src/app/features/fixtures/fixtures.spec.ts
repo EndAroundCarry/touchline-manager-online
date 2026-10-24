@@ -42,6 +42,8 @@ describe('Fixtures', () => {
       awayScore: away,
       matchId: `match-${id}`,
       outcome: home > away ? 'win' : home < away ? 'loss' : 'draw',
+      kind: 'league',
+      stageLabel: null,
     };
   }
 
@@ -137,6 +139,21 @@ describe('Fixtures', () => {
     expect(root.textContent).not.toContain('3–0');
     expect(root.textContent).not.toContain('Win');
     expect(button(root, 'Show result'), 'the result is one click away').toBeDefined();
+  });
+
+  it('names a promotion play-off match by its stage rather than a round number', async () => {
+    const root = await renderOnUpcoming([
+      scheduled('a', 30, 'Vale Athletic'),
+      {
+        ...scheduled('b', 32, 'Northfield'),
+        kind: 'playoff',
+        stageLabel: 'Play-off final',
+      },
+    ]);
+
+    expect(root.textContent).toContain('Play-off final');
+    expect(root.textContent).not.toContain('Round 32');
+    expect(root.textContent, 'a league match keeps its round').toContain('Round 30');
   });
 
   it('keeps the way to watch the match beside the held-back result', async () => {

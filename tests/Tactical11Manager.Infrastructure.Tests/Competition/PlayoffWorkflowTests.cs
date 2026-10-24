@@ -286,6 +286,111 @@ public sealed class PlayoffWorkflowTests
     }
 
     [Fact]
+    public async Task The_reads_name_the_play_off_stage_hold_the_shoot_out_until_it_is_published_and_show_the_final_to_the_visitor()
+    {
+        var pair = await FindPairAsync(LaunchCountries.FranceCode);
+
+        await SetClockAfterLastRoundAsync(pair);
+        await PlayAsync(pair.Upper.LastRoundId);
+        await PlayAsync(pair.Lower.LastRoundId);
+
+        // The tables say what each place leads to, in words.
+        var upperZones = await ZonesOfAsync(pair.Upper);
+        var lowerZones = await ZonesOfAsync(pair.Lower);
+
+        upperZones.Select(zone => zone.Zone).Should().Equal(
+            [.. Enumerable.Repeat("none", WorldRuleSet.PlayoffHolderPlace - 1), "playoff", "relegation", "relegation"]);
+        upperZones.Single(zone => zone.Zone == "playoff").Label.Should().Be("Play-off");
+        lowerZones.Select(zone => zone.Zone).Should().Equal(
+            [
+                "promotion",
+                "promotion",
+                "playoff",
+                "playoff",
+                .. Enumerable.Repeat("none", WorldRuleSet.ClubsPerDivision - 4),
+            ]);
+        lowerZones[0].Label.Should().Be("Promotion");
+
+        var semi = (await TiesAsync(pair)).Single(tie => tie.Stage == PlayoffStage.SemiFinal);
+        var semiRoundId = await RoundOfFixtureAsync(semi.FixtureId!.Value);
+
+        // Before it is played, the semi-final is named for what it is and says nothing about a shoot-out.
+        var beforeDetail = await DetailOfAsync(semi.FixtureId.Value);
+
+        beforeDetail.Kind.Should().Be("playoff");
+        beforeDetail.StageLabel.Should().Be("Play-off semi-final");
+        beforeDetail.Playoff.Should().BeNull();
+
+        var lowerCalendar = await CalendarOfAsync(pair.Lower);
+        var semiRound = lowerCalendar.Matchdays.Single(matchday => matchday.Kind == "playoff");
+
+        semiRound.RoundNumber.Should().Be(WorldRuleSet.MatchdaysPerSeason + WorldRuleSet.PlayoffSemiSlot);
+        semiRound.StageLabel.Should().Be("Play-off semi-final");
+        semiRound.Fixtures.Single().Kind.Should().Be("playoff");
+        lowerCalendar.Matchdays.Where(matchday => matchday.Kind == "league").Should().HaveCount(WorldRuleSet.MatchdaysPerSeason);
+
+        await LockAndResolveAsync(semiRoundId);
+        await SetScoreAsync(semi.FixtureId.Value, 1, 1);
+
+        (await DetailOfAsync(semi.FixtureId.Value)).Playoff.Should().BeNull("a staged result is not public");
+
+        await PublishAsync(semiRoundId);
+
+        var tie = (await TiesAsync(pair)).Single(candidate => candidate.Stage == PlayoffStage.SemiFinal);
+        var detail = await DetailOfAsync(semi.FixtureId.Value);
+
+        detail.Playoff.Should().NotBeNull();
+        detail.Playoff!.Stage.Should().Be("semi_final");
+        detail.Playoff.StageLabel.Should().Be("Play-off semi-final");
+        detail.Playoff.DecidedBy.Should().Be("penalties");
+        detail.Playoff.WinnerClubId.Should().Be(tie.WinnerClubId);
+        detail.Playoff.ShootoutHomeScore.Should().Be(tie.ShootoutHomeScore);
+        detail.Playoff.ShootoutAwayScore.Should().Be(tie.ShootoutAwayScore);
+        detail.Playoff.Kicks.Count.Should().BeGreaterThanOrEqualTo(6);
+        detail.Playoff.Kicks.Should().OnlyContain(kick => kick.TakerName != string.Empty && kick.TakerName != "Unknown player");
+        detail.Playoff.Kicks.Select(kick => kick.Number).Should().Equal(Enumerable.Range(1, detail.Playoff.Kicks.Count));
+        detail.Playoff.Kicks.Count(kick => kick.Side == "home" && kick.Outcome == "scored").Should().Be(tie.ShootoutHomeScore);
+
+        // The match page reads the same block.
+        await using (var scope = Fixture.CreateScope())
+        {
+            var matchId = detail.MatchId!.Value;
+            var match = await scope.ServiceProvider.GetRequiredService<Application.Abstractions.Match.IMatchQueries>()
+                .GetMatchAsync(matchId, CancellationToken.None);
+            var response = match!.ToResponse(Fixture.Clock.UtcNow);
+
+            response.Kind.Should().Be("playoff");
+            response.StageLabel.Should().Be("Play-off semi-final");
+            response.Playoff!.Kicks.Should().HaveCount(detail.Playoff.Kicks.Count);
+            response.Playoff.DecidedBy.Should().Be("penalties");
+        }
+
+        // The final is hosted by the higher league, so the visiting club finds it in its own list and the calendar names it.
+        var final = (await TiesAsync(pair)).Single(candidate => candidate.Stage == PlayoffStage.Final);
+        var challenger = final.AwayClubId!.Value;
+
+        await using (var scope = Fixture.CreateScope())
+        {
+            var queries = scope.ServiceProvider.GetRequiredService<Application.Abstractions.Competition.ICompetitionQueries>();
+            var mine = (await queries.GetClubFixturesAsync(challenger, CancellationToken.None))!.ToResponse(Fixture.Clock.UtcNow);
+
+            var seen = mine.Fixtures.Single(fixture => fixture.Id == final.FixtureId);
+
+            seen.Kind.Should().Be("playoff");
+            seen.StageLabel.Should().Be("Play-off final");
+            seen.Venue.Should().Be("away");
+            mine.Fixtures.Count(fixture => fixture.Kind == "playoff").Should().Be(2, "the semi-final it won and the final it plays");
+
+            var upperCalendar = await CalendarOfAsync(pair.Upper);
+
+            upperCalendar.Clubs.Select(club => club.Id).Should().Contain(challenger, "the visitor of a final is named in the host league's calendar");
+            upperCalendar.Matchdays.Single(matchday => matchday.Kind == "playoff").StageLabel.Should().Be("Play-off final");
+        }
+
+        (await DetailOfAsync(final.FixtureId!.Value)).Playoff.Should().BeNull("the final has not been played");
+    }
+
+    [Fact]
     public async Task A_red_card_in_the_semi_final_is_served_in_the_final_and_a_visitors_cards_go_to_its_own_league()
     {
         var pair = await FindPairAsync(LaunchCountries.PortugalCode);
@@ -604,6 +709,36 @@ public sealed class PlayoffWorkflowTests
             .Where(tie => tie.SeasonId == pair.SeasonId && tie.CountryId == pair.CountryId)
             .OrderBy(tie => tie.Slot)
             .ToListAsync();
+    }
+
+    private async Task<List<(string Zone, string Label)>> ZonesOfAsync(League league)
+    {
+        await using var scope = Fixture.CreateScope();
+
+        var table = await scope.ServiceProvider.GetRequiredService<Application.Abstractions.Competition.ICompetitionQueries>()
+            .GetDivisionTableAsync(league.DivisionId, CancellationToken.None);
+
+        return [.. table!.ToResponse(Fixture.Clock.UtcNow).Rows.Select(row => (row.Zone, row.ZoneLabel))];
+    }
+
+    private async Task<Contracts.Competition.FixtureDetailResponse> DetailOfAsync(Guid fixtureId)
+    {
+        await using var scope = Fixture.CreateScope();
+
+        var snapshot = await scope.ServiceProvider.GetRequiredService<Application.Abstractions.Competition.ICompetitionQueries>()
+            .GetFixtureAsync(fixtureId, CancellationToken.None);
+
+        return snapshot!.ToResponse(managedClubId: null, Fixture.Clock.UtcNow);
+    }
+
+    private async Task<Contracts.Competition.DivisionFixturesResponse> CalendarOfAsync(League league)
+    {
+        await using var scope = Fixture.CreateScope();
+
+        var snapshot = await scope.ServiceProvider.GetRequiredService<Application.Abstractions.Competition.ICompetitionQueries>()
+            .GetDivisionFixturesAsync(league.DivisionId, CancellationToken.None);
+
+        return snapshot!.ToResponse(Fixture.Clock.UtcNow);
     }
 
     private async Task<List<Guid>> RankedClubsAsync(League league)

@@ -184,7 +184,7 @@ export function calendarEvents(
       at: fixture.kickoffAt,
       kind: 'match',
       title: opponent,
-      detail: roundLabel(fixture.roundNumber),
+      detail: roundLabel(fixture.roundNumber, fixture.stageLabel),
       link: ['/tactics'],
     });
 

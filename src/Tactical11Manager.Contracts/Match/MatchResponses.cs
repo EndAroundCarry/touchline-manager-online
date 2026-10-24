@@ -89,6 +89,9 @@ public sealed record MatchTeamResponse(
 /// <param name="Away">The visitor.</param>
 /// <param name="EngineVersion">The engine version that produced the result.</param>
 /// <param name="PresentationVersion">The version of the replay presentation this match offers.</param>
+/// <param name="Kind">What the match was for: <c>league</c> or <c>playoff</c> (`PR-4`).</param>
+/// <param name="StageLabel">For a play-off match, the words for its stage; null for a league match.</param>
+/// <param name="Playoff">How a play-off match was settled, with its shoot-out when there was one (`PR-6`).</param>
 /// <param name="ServerTime">The instant the response was produced.</param>
 public sealed record MatchResponse(
     Guid MatchId,
@@ -108,4 +111,7 @@ public sealed record MatchResponse(
     MatchTeamResponse Away,
     string EngineVersion,
     string PresentationVersion,
+    string Kind,
+    string? StageLabel,
+    Competition.PlayoffResultResponse? Playoff,
     DateTimeOffset ServerTime);

@@ -34,6 +34,8 @@ function row(rank: number, clubId = `club-${rank}`): DivisionTableRow {
     points: 0,
     yellowCards: 0,
     redCards: 0,
+    zone: 'none',
+    zoneLabel: '',
   };
 }
 
@@ -256,6 +258,8 @@ const FIXTURES: MyFixtures = {
       awayScore: 0,
       matchId: 'm1',
       outcome: 'win',
+      kind: 'league',
+      stageLabel: null,
     },
     {
       id: 'f2',
@@ -275,6 +279,8 @@ const FIXTURES: MyFixtures = {
       awayScore: null,
       matchId: null,
       outcome: null,
+      kind: 'league',
+      stageLabel: null,
     },
     {
       id: 'f3',
@@ -294,6 +300,8 @@ const FIXTURES: MyFixtures = {
       awayScore: null,
       matchId: null,
       outcome: null,
+      kind: 'league',
+      stageLabel: null,
     },
   ],
 };

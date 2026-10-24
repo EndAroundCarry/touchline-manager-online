@@ -34,6 +34,8 @@ describe('ResultGate', () => {
       awayScore: 1,
       matchId: 'match-1',
       outcome: 'win',
+      kind: 'league',
+      stageLabel: null,
       ...overrides,
     };
   }

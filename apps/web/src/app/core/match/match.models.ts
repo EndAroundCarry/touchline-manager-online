@@ -1,3 +1,5 @@
+import type { PlayoffResult } from '../competition/competition.models';
+
 /**
  * Transport shapes for the match center (master plan §9.5, §11.1).
  *
@@ -55,6 +57,15 @@ export interface Match {
   readonly away: MatchTeam;
   readonly engineVersion: string;
   readonly presentationVersion: string;
+
+  /** What the match was for: `league` or `playoff` (`PR-4`). */
+  readonly kind: string;
+
+  /** For a play-off match, the words for its stage, e.g. `Play-off final`; null for a league match. */
+  readonly stageLabel: string | null;
+
+  /** How a play-off match was settled, with its shoot-out when there was one (`PR-6`). */
+  readonly playoff: PlayoffResult | null;
   readonly serverTime: string;
 }
 

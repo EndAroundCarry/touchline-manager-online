@@ -6,7 +6,7 @@
  * when a new one appears.
  */
 
-import type { DivisionPlayerStat } from './competition.models';
+import type { DivisionPlayerStat, PlayoffKick, PlayoffResult } from './competition.models';
 
 const FIXTURE_STATUS_LABELS: Record<string, string> = {
   scheduled: 'Scheduled',
@@ -97,9 +97,82 @@ export function scoreLabel(home: number | null, away: number | null): string {
   return home === null || away === null ? '' : `${home}\u2013${away}`;
 }
 
-/** A round's label, e.g. `Round 14`. */
-export function roundLabel(roundNumber: number): string {
-  return `Round ${roundNumber}`;
+/**
+ * A match's label, e.g. `Round 14`, or its stage in words for a promotion play-off match, e.g. `Play-off final`.
+ *
+ * A play-off match is stored as round 31 to 33 of the league that hosts it, but those numbers mean nothing to a
+ * manager, so the server's words for the stage stand in for them (`PR-4`).
+ */
+export function roundLabel(roundNumber: number, stageLabel: string | null = null): string {
+  return stageLabel ?? `Round ${roundNumber}`;
+}
+
+const KICK_LABELS: Record<string, string> = {
+  scored: 'Scored',
+  saved: 'Saved',
+  wide: 'Missed',
+};
+
+/** Names how a shoot-out kick ended, falling back to the code. */
+export function kickOutcomeLabel(outcome: string): string {
+  return KICK_LABELS[outcome] ?? outcome;
+}
+
+/**
+ * Says who won a promotion play-off match and how, e.g. `Meadowbank won 4–3 on penalties`, or null while the tie is
+ * undecided or the match was not a play-off one (`PR-6`).
+ *
+ * The shoot-out score is read winner first, as the sentence is, whichever side was at home.
+ */
+export function playoffSummary(
+  playoff: PlayoffResult | null,
+  home: { readonly clubId: string; readonly name: string },
+  away: { readonly clubId: string; readonly name: string },
+): string | null {
+  if (playoff === null || playoff.winnerClubId === null) {
+    return null;
+  }
+
+  const homeWon = playoff.winnerClubId === home.clubId;
+  const winner = homeWon ? home : away;
+
+  if (
+    playoff.decidedBy === 'penalties' &&
+    playoff.shootoutHomeScore !== null &&
+    playoff.shootoutAwayScore !== null
+  ) {
+    const winning = homeWon ? playoff.shootoutHomeScore : playoff.shootoutAwayScore;
+    const losing = homeWon ? playoff.shootoutAwayScore : playoff.shootoutHomeScore;
+
+    return `${winner.name} won ${winning}–${losing} on penalties`;
+  }
+
+  return `${winner.name} won the tie`;
+}
+
+/** The kicks of a shoot-out grouped by round, so the page can lay them out as the two sides took them. */
+export function kicksByRound(kicks: readonly PlayoffKick[]): readonly {
+  readonly round: number;
+  readonly home: PlayoffKick | null;
+  readonly away: PlayoffKick | null;
+}[] {
+  const rounds = new Map<number, { home: PlayoffKick | null; away: PlayoffKick | null }>();
+
+  for (const kick of kicks) {
+    const entry = rounds.get(kick.round) ?? { home: null, away: null };
+
+    if (kick.side === 'home') {
+      entry.home = kick;
+    } else {
+      entry.away = kick;
+    }
+
+    rounds.set(kick.round, entry);
+  }
+
+  return [...rounds.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([round, entry]) => ({ round, home: entry.home, away: entry.away }));
 }
 
 /**

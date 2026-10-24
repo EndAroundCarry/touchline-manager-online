@@ -11,6 +11,12 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
+import {
+  kickOutcomeLabel,
+  kicksByRound,
+  playoffSummary,
+  roundLabel,
+} from '../../core/competition/competition-presentation';
 import { FadeEdge, fadeAlpha, fadeEdgesFor } from '../../core/match/film-fade';
 import { bannerPalette } from '../../core/match/commentary-banner';
 import { FeedRow, FilmTimeline, buildFilmTimeline } from '../../core/match/film-timeline';
@@ -53,6 +59,7 @@ import {
 } from '../../core/match/match-presentation';
 import {
   CommentaryLine,
+  Match,
   MatchLineup,
   MatchLineupPlayer,
   MatchPresentation,
@@ -354,6 +361,18 @@ export class MatchViewer implements OnDestroy {
 
     return match === null ? '' : scoreLine(match.home.goals, match.away.goals);
   });
+
+  /** Who won a promotion play-off match and how. Shown only once the result is, as a level 90 minutes gives the draw away. */
+  protected readonly playoffResult = computed(() => {
+    const match = this.match();
+
+    return match === null ? null : playoffSummary(match.playoff, match.home, match.away);
+  });
+
+  /** The shoot-out's kicks, a round at a time, for the report. Empty unless the tie went to penalties. */
+  protected readonly shootoutRounds = computed(() =>
+    kicksByRound(this.match()?.playoff?.kicks ?? []),
+  );
   protected readonly homeGoalAnimation = computed(() => this.scoringSide() === 'home');
   protected readonly awayGoalAnimation = computed(() => this.scoringSide() === 'away');
 
@@ -768,6 +787,16 @@ export class MatchViewer implements OnDestroy {
   /** Formats a match clock. */
   protected minute(minute: number, stoppageMinute: number): string {
     return matchClockLabel(minute, stoppageMinute);
+  }
+
+  /** The match's round, or its stage in words for a promotion play-off match. */
+  protected round(match: Match): string {
+    return roundLabel(match.roundNumber, match.stageLabel);
+  }
+
+  /** Names how a shoot-out kick ended. */
+  protected kickOutcome(outcome: string): string {
+    return kickOutcomeLabel(outcome);
   }
 
   /** Formats a kickoff in the viewer's local time. */

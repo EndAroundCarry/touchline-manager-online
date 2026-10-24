@@ -80,6 +80,9 @@ function match(): Match {
     },
     engineVersion: 'engine-v1',
     presentationVersion: 'highlights-v1',
+    kind: 'league',
+    stageLabel: null,
+    playoff: null,
     serverTime: '2026-10-06T21:00:00Z',
   };
 }

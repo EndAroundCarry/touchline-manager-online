@@ -92,7 +92,8 @@ internal sealed class MatchQueries : IMatchQueries
             row.Match.OutputHash,
             ClubRowOf(row.Home),
             ClubRowOf(row.Away),
-            snapshot);
+            snapshot,
+            await PlayoffReads.ForFixtureAsync(_dbContext, row.Fixture.Id, cancellationToken));
     }
 
     /// <summary>

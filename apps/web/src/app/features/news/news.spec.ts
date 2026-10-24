@@ -52,6 +52,8 @@ describe('News', () => {
       awayScore: 1,
       matchId: OWN_MATCH,
       outcome: 'win',
+      kind: 'league',
+      stageLabel: null,
     };
   }
 

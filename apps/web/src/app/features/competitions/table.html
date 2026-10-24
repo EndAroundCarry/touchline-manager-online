@@ -91,8 +91,11 @@
                 <th scope="col" class="w-10 px-1 py-1 text-right font-semibold">
                   <abbr title="Goal difference">GD</abbr>
                 </th>
-                <th scope="col" class="w-10 py-1 pl-1 pr-3 text-right font-semibold">
+                <th scope="col" class="w-10 py-1 pl-1 pr-2 text-right font-semibold">
                   <abbr title="Points">Pts</abbr>
+                </th>
+                <th scope="col" class="w-24 py-1 pl-2 pr-3 text-left font-semibold">
+                  <abbr title="What the place leads to at the end of the season">Zone</abbr>
                 </th>
               </tr>
             </thead>
@@ -126,8 +129,14 @@
                   <td class="px-1 py-[3px] fit:py-0 text-right tabular-nums">
                     {{ difference(row.goalDifference) }}
                   </td>
-                  <td class="py-[3px] fit:py-0 pl-1 pr-3 text-right font-semibold tabular-nums">
+                  <td class="py-[3px] fit:py-0 pl-1 pr-2 text-right font-semibold tabular-nums">
                     {{ row.points }}
+                  </td>
+                  <td
+                    class="py-[3px] fit:py-0 pl-2 pr-3 text-left text-xs text-ink-2"
+                    [attr.data-zone]="row.zone"
+                  >
+                    {{ row.zoneLabel }}
                   </td>
                 </tr>
               }

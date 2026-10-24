@@ -163,7 +163,8 @@ public sealed class GetMatchPresentationTests
             result.OutputHash,
             new MatchClubRow(HomeClubId, "Home Town", "HOM", "shield", "hoops"),
             new MatchClubRow(AwayClubId, "Away City", "AWY", "round", "sash"),
-            snapshot);
+            snapshot,
+            Playoff: null);
 
     /// <summary>A club with a full squad and nothing prepared, so the builder lays out the default shape.</summary>
     private static ClubSideSource Side(Guid clubId, string name) =>

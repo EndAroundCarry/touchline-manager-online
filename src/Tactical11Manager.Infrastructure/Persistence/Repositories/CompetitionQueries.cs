@@ -51,6 +51,7 @@ internal sealed class CompetitionQueries : ICompetitionQueries
                 DivisionSeasonId = divisionSeason.Id,
                 division.DisplayName,
                 division.TierNumber,
+                HasParent = division.ParentDivisionId != null,
                 CountryId = country.Id,
                 country.Code,
                 CountryName = country.DisplayName,
@@ -63,6 +64,13 @@ internal sealed class CompetitionQueries : ICompetitionQueries
         {
             return null;
         }
+
+        // The zones of the table depend on the pair of leagues it belongs to, so the read says whether a higher league
+        // takes its top places and whether a lower one sends up its own (PR-1).
+        var hasFeeder = await _dbContext.Divisions
+            .AnyAsync(
+                candidate => candidate.ParentDivisionId == divisionId && candidate.Status == DivisionStatus.Active,
+                cancellationToken);
 
         // One query for the table and its clubs: the projection stored the rank, so the read never sorts and
         // never needs a tie-break rule (TBL-12, TBL-13).
@@ -96,7 +104,9 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             header.CountryName,
             header.SeasonNumber,
             header.SeasonLabel,
-            rows);
+            rows,
+            header.HasParent,
+            hasFeeder);
     }
 
     /// <inheritdoc />
@@ -413,6 +423,11 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             .GroupBy(fixture => fixture.MatchdayId)
             .ToDictionary(group => group.Key, group => group.ToList());
 
+        var stages = await PlayoffReads.StagesByFixtureAsync(
+            _dbContext,
+            [.. fixtures.Select(fixture => fixture.Id)],
+            cancellationToken);
+
         var matchdayRows = matchdays
             .Select(matchday => new FixtureMatchdayRow(
                 matchday.Id,
@@ -421,9 +436,31 @@ internal sealed class CompetitionQueries : ICompetitionQueries
                 matchday.KickoffAt,
                 matchday.PublicationStatus,
                 byMatchday.TryGetValue(matchday.Id, out var list)
-                    ? [.. list.Select(ToRow)]
-                    : []))
+                    ? [.. list.Select(fixture => ToRow(fixture, stages))]
+                    : [],
+                matchday.Kind))
             .ToList();
+
+        // A play-off final is hosted here by a league's 14th and played against a club from the league below, which has
+        // no entry in this division-season, so the calendar names the visitors too and every fixture resolves to a name (PR-4).
+        var knownClubIds = clubs.Select(club => club.Id).ToHashSet();
+
+        var visitorIds = fixtures
+            .SelectMany(fixture => new[] { fixture.HomeClubId, fixture.AwayClubId })
+            .Where(id => !knownClubIds.Contains(id))
+            .Distinct()
+            .ToList();
+
+        if (visitorIds.Count > 0)
+        {
+            var visitors = await _dbContext.Clubs
+                .Where(club => visitorIds.Contains(club.Id))
+                .OrderBy(club => club.Name)
+                .Select(club => new FixtureClubRow(club.Id, club.Name, club.ShortName))
+                .ToListAsync(cancellationToken);
+
+            clubs = [.. clubs, .. visitors];
+        }
 
         return new DivisionFixturesSnapshot(
             header.Division.Id,
@@ -495,6 +532,11 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             select new { Fixture = fixture, Matchday = matchday, Home = home, Away = away })
             .ToListAsync(cancellationToken);
 
+        var stages = await PlayoffReads.StagesByFixtureAsync(
+            _dbContext,
+            [.. rows.Select(row => row.Fixture.Id)],
+            cancellationToken);
+
         var fixtures = rows
             .Select(row =>
             {
@@ -519,7 +561,8 @@ internal sealed class CompetitionQueries : ICompetitionQueries
                     row.Fixture.HomeScore,
                     row.Fixture.AwayScore,
                     row.Fixture.MatchId,
-                    row.Fixture.IsBootstrap);
+                    row.Fixture.IsBootstrap,
+                    stages.TryGetValue(row.Fixture.Id, out var stage) ? stage : null);
             })
             .ToList();
 
@@ -591,7 +634,8 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             row.Fixture.HomeScore,
             row.Fixture.AwayScore,
             row.Fixture.MatchId,
-            row.Fixture.IsBootstrap);
+            row.Fixture.IsBootstrap,
+            await PlayoffReads.ForFixtureAsync(_dbContext, row.Fixture.Id, cancellationToken));
     }
 
     /// <inheritdoc />
@@ -701,7 +745,7 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             movement);
     }
 
-    private static FixtureRow ToRow(Domain.Competition.Fixture fixture) =>
+    private static FixtureRow ToRow(Domain.Competition.Fixture fixture, Dictionary<Guid, PlayoffStage> stages) =>
         new(
             fixture.Id,
             fixture.HomeClubId,
@@ -711,5 +755,6 @@ internal sealed class CompetitionQueries : ICompetitionQueries
             fixture.HomeScore,
             fixture.AwayScore,
             fixture.MatchId,
-            fixture.IsBootstrap);
+            fixture.IsBootstrap,
+            stages.TryGetValue(fixture.Id, out var stage) ? stage : null);
 }

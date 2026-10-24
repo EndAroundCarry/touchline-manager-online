@@ -120,6 +120,8 @@ function fixture(
     awayScore: status === 'published' ? 1 : null,
     matchId,
     outcome: status === 'published' ? (venue === 'home' ? 'win' : 'loss') : null,
+    kind: 'league',
+    stageLabel: null,
   };
 }
 

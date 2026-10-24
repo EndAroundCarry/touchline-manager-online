@@ -30,9 +30,15 @@ export interface FixtureSummary {
   readonly homeScore: number | null;
   readonly awayScore: number | null;
   readonly matchId: string | null;
+
+  /** What the match is for: `league` or `playoff` (`PR-4`). */
+  readonly kind: string;
+
+  /** For a play-off match, the words for its stage, e.g. `Play-off final`; null for a league match. */
+  readonly stageLabel: string | null;
 }
 
-/** One round of a division's season (`CAL-10`). */
+/** One round of a division's season (`CAL-10`), or a promotion play-off match hosted in it (`PR-4`). */
 export interface FixtureMatchday {
   readonly id: string;
   readonly roundNumber: number;
@@ -40,6 +46,8 @@ export interface FixtureMatchday {
   readonly kickoffAt: string;
   readonly publicationStatus: string;
   readonly fixtures: readonly FixtureSummary[];
+  readonly kind: string;
+  readonly stageLabel: string | null;
 }
 
 /** A division-season's whole fixture calendar (§10.5). */
@@ -73,6 +81,12 @@ export interface DivisionTableRow {
   readonly points: number;
   readonly yellowCards: number;
   readonly redCards: number;
+
+  /** What the place leads to at the end of the season: `none`, `promotion`, `playoff` or `relegation` (`PR-1`). */
+  readonly zone: string;
+
+  /** The words for the zone, empty for none, so the table never says it in colour alone. */
+  readonly zoneLabel: string;
 }
 
 /**
@@ -241,6 +255,12 @@ export interface ClubFixture {
 
   /** For a published fixture, `win`, `draw`, or `loss`. Null while there is no result yet. */
   readonly outcome: string | null;
+
+  /** What the match is for: `league` or `playoff` (`PR-4`). */
+  readonly kind: string;
+
+  /** For a play-off match, the words for its stage, e.g. `Play-off final`; null for a league match. */
+  readonly stageLabel: string | null;
 }
 
 /** The manager's club's season fixture list, with the next fixture named (§11.1). */
@@ -267,6 +287,41 @@ export interface FixtureSide {
   readonly region: string;
 }
 
+/** One kick of a play-off shoot-out (`PR-6`). */
+export interface PlayoffKick {
+  readonly number: number;
+  readonly round: number;
+
+  /** The side that took it: `home` or `away`. */
+  readonly side: string;
+  readonly takerName: string;
+  readonly goalkeeperName: string | null;
+
+  /** How it ended: `scored`, `saved` or `wide`. */
+  readonly outcome: string;
+}
+
+/**
+ * How a promotion play-off match was settled (`PR-6`).
+ *
+ * A level 90 minutes is itself a spoiler, so the screens that show this keep it behind the same gate as the score.
+ */
+export interface PlayoffResult {
+  /** `semi_final` or `final`. */
+  readonly stage: string;
+  readonly stageLabel: string;
+
+  /** `score` or `penalties`; null while the tie is undecided. */
+  readonly decidedBy: string | null;
+  readonly winnerClubId: string | null;
+  readonly shootoutHomeScore: number | null;
+  readonly shootoutAwayScore: number | null;
+
+  /** The side that kicked first in a shoot-out: `home` or `away`. */
+  readonly firstSide: string | null;
+  readonly kicks: readonly PlayoffKick[];
+}
+
 /** A fixture in full, as the prepare-match screen reads it (§11.1). */
 export interface FixtureDetail {
   readonly id: string;
@@ -287,6 +342,11 @@ export interface FixtureDetail {
   readonly homeScore: number | null;
   readonly awayScore: number | null;
   readonly matchId: string | null;
+  readonly kind: string;
+  readonly stageLabel: string | null;
+
+  /** How a play-off match was settled; present only once the fixture is published (`PR-6`). */
+  readonly playoff: PlayoffResult | null;
   readonly serverTime: string;
 }
 

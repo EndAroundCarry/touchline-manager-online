@@ -51,7 +51,9 @@ public sealed class MatchCalendarSource : ICalendarEventSource
         var title = string.Create(
             CultureInfo.InvariantCulture,
             $"{(fixture.IsHome ? "Home" : "Away")} v {fixture.OpponentName}");
-        var round = string.Create(CultureInfo.InvariantCulture, $"Round {fixture.RoundNumber}");
+        // A promotion play-off match is named by its stage; the round number 31-33 is only where it is stored (PR-4).
+        var round = response.StageLabel
+            ?? string.Create(CultureInfo.InvariantCulture, $"Round {fixture.RoundNumber}");
 
         if (response.MatchId is { } matchId && response.HomeScore is { } home && response.AwayScore is { } away)
         {

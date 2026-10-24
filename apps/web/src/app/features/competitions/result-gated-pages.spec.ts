@@ -39,6 +39,8 @@ describe('The division aggregates', () => {
     awayScore: 0,
     matchId: 'match-1',
     outcome: 'win',
+    kind: 'league',
+    stageLabel: null,
   };
 
   const FIXTURES: MyFixtures = {
@@ -82,6 +84,8 @@ describe('The division aggregates', () => {
           points: 3,
           yellowCards: 0,
           redCards: 0,
+          zone: 'none',
+          zoneLabel: '',
         },
       ],
     };

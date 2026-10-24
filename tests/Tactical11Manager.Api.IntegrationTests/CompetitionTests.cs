@@ -72,12 +72,16 @@ public sealed class CompetitionTests : IAsyncLifetime
         var next = my.Fixtures.Single(fixture => fixture.Id == my.NextFixtureId);
         next.OpponentName.Should().NotBeEmpty();
         next.Venue.Should().BeOneOf("home", "away");
+        my.Fixtures.Should().OnlyContain(
+            fixture => fixture.Kind == "league" && fixture.StageLabel == null,
+            "PR-4: no play-off is drawn before the league season ends");
 
         var calendar = (await client.GetFromJsonAsync<DivisionFixturesResponse>(
             $"/api/v1/divisions/{my.DivisionId}/fixtures"))!;
 
         calendar.Clubs.Should().HaveCount(WorldRuleSet.ClubsPerDivision, "WORLD-4");
         calendar.Matchdays.Should().HaveCount(WorldRuleSet.MatchdaysPerSeason, "CAL-1");
+        calendar.Matchdays.Should().OnlyContain(matchday => matchday.Kind == "league" && matchday.StageLabel == null);
         calendar.Matchdays.SelectMany(matchday => matchday.Fixtures).Should()
             .HaveCount(WorldRuleSet.ClubsPerDivision / 2 * WorldRuleSet.MatchdaysPerSeason);
 
@@ -102,6 +106,15 @@ public sealed class CompetitionTests : IAsyncLifetime
         table.Rows.Select(row => row.Rank).Should().Equal(Enumerable.Range(1, WorldRuleSet.ClubsPerDivision));
         table.Rows.Should().OnlyContain(row => row.Played == 0 && row.Points == 0 && row.GoalDifference == 0);
         table.Rows.Should().OnlyContain(row => !string.IsNullOrEmpty(row.ClubName));
+        table.Rows.Should().OnlyContain(
+            row => (row.Zone == "none") == (row.ZoneLabel == string.Empty),
+            "PR-1: a place that leads somewhere is named in words");
+
+        if (table.TierNumber > 1)
+        {
+            table.Rows[0].Zone.Should().Be("promotion", "a lower league's champion goes up");
+            table.Rows[0].ZoneLabel.Should().Be("Promotion");
+        }
         table.SeasonLabel.Should().NotBeEmpty();
         table.ServerTime.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2), "TIME-5");
 
@@ -153,6 +166,9 @@ public sealed class CompetitionTests : IAsyncLifetime
         detail.ManagedSide.Should().BeOneOf("home", "away");
         detail.IsLocked.Should().BeFalse("a fixture in the future has not locked yet");
         detail.Home.Name.Should().NotBeEmpty();
+        detail.Kind.Should().Be("league");
+        detail.StageLabel.Should().BeNull();
+        detail.Playoff.Should().BeNull("PR-6: a play-off block exists only for a published play-off match");
 
         await client.PostAsync("/api/v1/club-tenure/resign", content: null);
     }
